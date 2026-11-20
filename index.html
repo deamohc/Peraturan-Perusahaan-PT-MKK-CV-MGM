@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Peraturan Perusahaan - Medika Group</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+
+    @keyframes float {
+      0% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-20px) scale(1.05); }
+      100% { transform: translateY(0px) scale(1); }
+    }
+    .animate-float-slow { animation: float 6s ease-in-out infinite; }
+    .animate-float-fast { animation: float 4s ease-in-out infinite reverse; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-slate-800 min-h-screen flex flex-col relative overflow-x-hidden" x-data="appData()" x-init="initApp()">
+
+  <!-- ELEMEN ANIMASI LATAR BELAKANG -->
+  <div class="absolute top-10 left-10 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl animate-float-slow pointer-events-none"></div>
+  <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-float-fast pointer-events-none"></div>
+
+  <!-- 1. HALAMAN LOGIN -->
+  <template x-if="!isLoggedIn">
+    <div class="flex-grow flex items-center justify-center px-4 py-12 relative z-10">
+      <div class="max-w-md w-full bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-8 space-y-6">
+        <div class="text-center space-y-2">
+          <div class="inline-flex w-16 h-16 rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 items-center justify-center p-1 mx-auto shadow-inner">
+            <img :src="loginLogo" alt="Portal Logo" class="w-full h-full object-contain">
+          </div>
+          <h1 class="text-2xl font-bold text-slate-900">Portal Peraturan Perusahaan</h1>
+          <p class="text-sm text-slate-500">Silakan login sesuai unit kerja dan NIK Anda</p>
+        </div>
+
+        <form @submit.prevent="handleLogin()" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Pilih Unit Perusahaan</label>
+            <select x-model="loginForm.branch" required class="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500">
+              <option value="PT_MKK">PT Medika Kesehatan Kerja (PT MKK)</option>
+              <option value="CV_MGM">CV Medika Group Mandiri (CV MGM)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nama Lengkap</label>
+            <input type="text" x-model="loginForm.name" placeholder="Masukkan nama lengkap" required class="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nomor Induk Karyawan (NIK)</label>
+            <input type="text" x-model="loginForm.nik" placeholder="Contoh: MKK-001 / MGM-001" required class="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Jabatan / Bagian</label>
+            <input type="text" x-model="loginForm.position" placeholder="Contoh: Staff HR / Perawat" required class="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+            <span>Masuk sebagai Karyawan</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </form>
+
+        <div class="text-center pt-3 border-t border-slate-100">
+          <button @click="promptAdminLogin()" class="text-xs text-slate-500 hover:text-emerald-600 font-medium underline flex items-center justify-center gap-1 mx-auto">
+            <i data-lucide="lock" class="w-3 h-3"></i> Login khusus Administrator HR
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 2. APLIKASI UTAMA -->
+  <template x-if="isLoggedIn">
+    <div class="flex-grow flex flex-col min-h-screen relative z-10">
+      
+      <!-- HEADER DINAMIS -->
+      <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b shadow-sm" :class="currentUser.role === 'admin' ? 'border-slate-200' : (currentUser.branch === 'PT_MKK' ? 'border-blue-200' : 'border-rose-200')">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex items-center justify-between h-16">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-xl overflow-hidden bg-white border flex items-center justify-center p-1 shadow-sm"
+                   :class="currentUser.branch === 'PT_MKK' ? 'border-blue-300' : 'border-rose-300'">
+                <template x-if="currentUser.role === 'admin'">
+                  <i data-lucide="shield-check" class="w-6 h-6 text-emerald-600"></i>
+                </template>
+                <template x-if="currentUser.role !== 'admin' && currentUser.branch === 'PT_MKK'">
+                  <img :src="branches.PT_MKK.logo" alt="Logo PT MKK" class="w-full h-full object-contain">
+                </template>
+                <template x-if="currentUser.role !== 'admin' && currentUser.branch === 'CV_MGM'">
+                  <img :src="branches.CV_MGM.logo" alt="Logo CV MGM" class="w-full h-full object-contain">
+                </template>
+              </div>
+              <div>
+                <h1 class="text-sm sm:text-base font-bold text-slate-900 leading-tight" x-text="currentUser.role === 'admin' ? 'Admin Panel & Manajemen Peraturan HR' : activeBranchData.name"></h1>
+                <p class="text-xs font-semibold" :class="currentUser.role === 'admin' ? 'text-emerald-600' : (currentUser.branch === 'PT_MKK' ? 'text-blue-600' : 'text-rose-600')" 
+                   x-text="currentUser.role === 'admin' ? 'Administrator Terverifikasi' : 'Login: ' + currentUser.name + ' (' + currentUser.nik + ') - ' + currentUser.position"></p>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+              <!-- TOMBOL NOTIFIKASI KARYAWAN -->
+              <template x-if="currentUser.role !== 'admin'">
+                <div class="relative">
+                  <button @click="showNotifDrawer = !showNotifDrawer; markNotificationsRead()" class="relative p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <span x-show="unreadNotificationsCount > 0" x-text="unreadNotificationsCount" class="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce"></span>
+                  </button>
+
+                  <!-- DROPDOWN NOTIFIKASI -->
+                  <div x-show="showNotifDrawer" @click.away="showNotifDrawer = false" class="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 z-50 space-y-3">
+                    <div class="flex items-center justify-between border-b pb-2">
+                      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Notifikasi Pembaruan Peraturan</h3>
+                      <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold" x-text="branchNotifications.length + ' Update'"></span>
+                    </div>
+                    <div class="max-h-72 overflow-y-auto space-y-2.5">
+                      <template x-for="notif in branchNotifications" :key="notif.id">
+                        <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
+                          <div class="flex items-center justify-between">
+                            <span class="font-bold text-emerald-700" x-text="notif.title"></span>
+                            <span class="text-[10px] text-slate-400" x-text="notif.date"></span>
+                          </div>
+                          <p class="text-slate-600 leading-relaxed" x-text="notif.message"></p>
+                        </div>
+                      </template>
+                      <div x-show="branchNotifications.length === 0" class="text-center py-4 text-xs text-slate-400">
+                        Belum ada pembaruan peraturan terbaru.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <button @click="logout()" class="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold px-3 py-2 rounded-lg transition">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Keluar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+          <!-- SIDEBAR -->
+          <aside class="lg:col-span-1 space-y-4">
+            <div x-show="currentUser.role !== 'admin'" class="bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-sm border border-slate-200">
+              <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Cari Bab / Pasal / Kata Kunci</label>
+              <div class="relative">
+                <input type="text" x-model="searchQuery" @input="selectedBab = null" placeholder="Cari cuti, lembur, sanksi, duka..." class="w-full pl-9 pr-8 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2"
+                       :class="currentUser.branch === 'PT_MKK' ? 'focus:ring-blue-500' : 'focus:ring-rose-500'">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <p x-show="searchQuery" class="text-[11px] text-emerald-700 font-medium mt-2" x-text="'Ditemukan ' + filteredRules.length + ' Bab yang cocok.'"></p>
+            </div>
+
+            <div x-show="currentUser.role !== 'admin'" class="border p-4 rounded-xl text-xs space-y-2 shadow-sm backdrop-blur-sm"
+                 :class="currentUser.branch === 'PT_MKK' ? 'bg-blue-50/95 border-blue-200 text-blue-900' : 'bg-rose-50/95 border-rose-200 text-rose-900'">
+              <div class="font-bold flex items-center gap-1.5">
+                <i data-lucide="building-2" class="w-4 h-4"></i> Informasi Unit Kerja
+              </div>
+              <p><strong>Pimpinan:</strong> <span x-text="activeBranchData.leader"></span></p>
+              <p><strong>Jam Kerja HO:</strong> <span x-text="activeBranchData.workHours"></span></p>
+              <p><strong>Absensi:</strong> <span x-text="activeBranchData.absentMethod"></span></p>
+              <p><strong>Cakupan Dokumen:</strong> <span x-text="activeBranchRules.length + ' Bab (' + activeBranchData.totalPasal + ')'"></span></p>
+            </div>
+
+            <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-slate-200 p-2 space-y-1">
+              <template x-if="currentUser.role !== 'admin'">
+                <div class="space-y-1">
+                  <button @click="activeTab = 'bacapp'; selectedBab = null;" :class="activeTab === 'bacapp' ? (currentUser.branch === 'PT_MKK' ? 'bg-blue-50 text-blue-700 font-semibold' : 'bg-rose-50 text-rose-700 font-semibold') : 'text-slate-600 hover:bg-slate-50'" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm text-left transition">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                    <span x-text="currentUser.branch === 'PT_MKK' ? 'Baca Peraturan (Bab I - XIV)' : 'Baca Peraturan (Bab I - XIII)'"></span>
+                  </button>
+                  <button @click="activeTab = 'sanksi'" :class="activeTab === 'sanksi' ? (currentUser.branch === 'PT_MKK' ? 'bg-blue-50 text-blue-700 font-semibold' : 'bg-rose-50 text-rose-700 font-semibold') : 'text-slate-600 hover:bg-slate-50'" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm text-left transition">
+                    <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                    <span x-text="currentUser.branch === 'PT_MKK' ? 'Daftar Sanksi & Pasal 41' : 'Daftar Sanksi & Pasal 34'"></span>
+                  </button>
+                  <button @click="activeTab = 'kepatuhan'; $nextTick(() => initCanvas())" :class="activeTab === 'kepatuhan' ? (currentUser.branch === 'PT_MKK' ? 'bg-blue-50 text-blue-700 font-semibold' : 'bg-rose-50 text-rose-700 font-semibold') : 'text-slate-600 hover:bg-slate-50'" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm text-left transition">
+                    <i data-lucide="file-signature" class="w-4 h-4"></i>
+                    <span>Pernyataan Kepatuhan</span>
+                  </button>
+                </div>
+              </template>
+
+              <template x-if="currentUser.role === 'admin'">
+                <div class="space-y-1">
+                  <button @click="activeTab = 'admin_dashboard'" :class="activeTab === 'admin_dashboard' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm text-left transition">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Log Kepatuhan Karyawan</span>
+                  </button>
+                  <button @click="activeTab = 'admin_notif'" :class="activeTab === 'admin_notif' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm text-left transition">
+                    <i data-lucide="megaphone" class="w-4 h-4"></i>
+                    <span>Kirim Notifikasi & Update Pasal</span>
+                  </button>
+                  <button @click="activeTab = 'admin_settings'" :class="activeTab === 'admin_settings' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm text-left transition">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                    <span>Pengaturan Logo / Animasi GIF</span>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </aside>
+
+          <!-- CONTENT AREA -->
+          <section class="lg:col-span-3 space-y-6">
+
+            <!-- BANNER NOTIFIKASI UPDATE TERBARU (OTOMATIS MUNCUL JIKA ADA UPDATE) -->
+            <template x-if="currentUser.role !== 'admin' && latestNotification">
+              <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm flex items-start justify-between gap-4 animate-fade-in">
+                <div class="flex items-start gap-3">
+                  <div class="p-2 bg-amber-100 rounded-lg text-amber-700 mt-0.5">
+                    <i data-lucide="bell-ring" class="w-5 h-5"></i>
+                  </div>
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-[10px] font-bold uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded">Update Peraturan Terbaru</span>
+                      <span class="text-xs text-slate-500" x-text="latestNotification.date"></span>
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-900" x-text="latestNotification.title"></h3>
+                    <p class="text-xs text-slate-700 leading-relaxed" x-text="latestNotification.message"></p>
+                  </div>
+                </div>
+                <button @click="dismissBanner()" class="text-slate-400 hover:text-slate-600 p-1">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </template>
+
+            <!-- BANNER SAPAAN -->
+            <template x-if="currentUser.role !== 'admin'">
+              <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
+                <div class="space-y-1 text-center sm:text-left">
+                  <span class="text-xs uppercase tracking-wider bg-emerald-800/60 px-3 py-1 rounded-full font-medium">Portal Karyawan Aktif • Edisi Juni 2026</span>
+                  <h2 class="text-2xl font-bold pt-1" x-text="greetingText + ', ' + currentUser.name + '!'"></h2>
+                  <p class="text-xs text-emerald-100 opacity-90">Selamat datang di Portal Peraturan Perusahaan <span x-text="activeBranchData.name"></span>. Silakan baca seluruh Bab & isi pernyataan kepatuhan Anda.</p>
+                </div>
+                <div class="p-3 bg-white/10 rounded-2xl backdrop-blur-sm hidden sm:flex items-center justify-center">
+                  <i data-lucide="book-check" class="w-10 h-10 text-emerald-200"></i>
+                </div>
+              </div>
+            </template>
+
+            <!-- TAB 1: BACA PERATURAN LENGKAP -->
+            <div x-show="activeTab === 'bacapp' && currentUser.role !== 'admin'" class="space-y-4">
+              <template x-if="!selectedBab">
+                <div class="space-y-4">
+                  <div class="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div class="flex items-center gap-4">
+                      <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-50 border overflow-hidden p-1">
+                        <img :src="activeBranchData.logo" alt="Logo" class="w-full h-full object-contain">
+                      </div>
+                      <div>
+                        <h2 class="text-xl font-bold text-slate-900" x-text="activeBranchData.name"></h2>
+                        <p class="text-sm text-slate-500">Klik Bab di bawah ini untuk membaca seluruh Pasal dan Ayat secara lengkap</p>
+                      </div>
+                    </div>
+                    <span class="text-xs font-semibold px-3 py-1 rounded-full shadow-sm"
+                          :class="currentUser.branch === 'PT_MKK' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'" 
+                          x-text="activeBranchData.shortName"></span>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <template x-for="(bab, index) in filteredRules" :key="bab.id">
+                      <div @click="selectedBab = bab; $nextTick(() => lucide.createIcons())" 
+                           class="bg-white/95 backdrop-blur-sm p-5 rounded-xl shadow-sm border border-slate-200 hover:border-emerald-500 hover:shadow-md transition cursor-pointer flex flex-col justify-between space-y-3 group">
+                        <div class="flex items-start justify-between">
+                          <span class="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 group-hover:bg-emerald-100 group-hover:text-emerald-800 transition" x-text="bab.babLabel"></span>
+                          <span class="text-[11px] font-medium text-slate-400" x-text="bab.pasalRange"></span>
+                        </div>
+                        <h3 class="font-bold text-slate-900 text-base group-hover:text-emerald-700 transition" x-text="bab.title"></h3>
+                        <p class="text-xs text-slate-500 line-clamp-2" x-text="bab.summary"></p>
+                        <div class="pt-1 flex items-center text-xs font-semibold text-emerald-600">
+                          <span>Baca Selengkapnya</span>
+                          <i data-lucide="arrow-right" class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1"></i>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div x-show="filteredRules.length === 0" class="bg-white/95 p-8 rounded-xl text-center space-y-2 border border-slate-200">
+                    <p class="text-sm font-bold text-slate-700">Tidak ditemukan Bab atau Pasal dengan kata kunci "<span x-text="searchQuery"></span>"</p>
+                    <button @click="searchQuery = ''" class="text-xs text-emerald-600 font-semibold underline">Reset Pencarian</button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- DETAIL ISI BAB -->
+              <template x-if="selectedBab">
+                <div class="bg-white/95 backdrop-blur-sm p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200 space-y-6 animate-fade-in">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <button @click="selectedBab = null; $nextTick(() => lucide.createIcons())" class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-2 rounded-lg transition">
+                      <i data-lucide="arrow-left" class="w-4 h-4"></i> Kembali ke Daftar Bab
+                    </button>
+                    <span class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-600" x-text="selectedBab.pasalRange"></span>
+                  </div>
+
+                  <div class="border-b pb-4 space-y-1">
+                    <span class="text-xs font-bold uppercase tracking-wider text-emerald-600" x-text="selectedBab.babLabel"></span>
+                    <h2 class="text-2xl font-bold text-slate-900" x-text="selectedBab.title"></h2>
+                    <p class="text-xs text-slate-500" x-text="activeBranchData.name + ' • Ditetapkan di Jakarta, 8 Juni 2026'"></p>
+                  </div>
+
+                  <div class="text-sm text-slate-700 leading-relaxed space-y-6" x-html="selectedBab.content"></div>
+
+                  <div class="pt-6 border-t flex justify-between items-center">
+                    <button @click="selectedBab = null; window.scrollTo({top: 0, behavior: 'smooth'}); $nextTick(() => lucide.createIcons())" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition flex items-center gap-1.5">
+                      <i data-lucide="arrow-left" class="w-4 h-4"></i> Tutup & Pilih Bab Lain
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- TAB 2: DAFTAR SANKSI & PASAL LENGKAP -->
+            <div x-show="activeTab === 'sanksi' && currentUser.role !== 'admin'" class="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+              <div>
+                <span class="text-xs font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-md uppercase tracking-wider"
+                      x-text="currentUser.branch === 'PT_MKK' ? 'Pasal 41 Resmi (PT MKK)' : 'Pasal 34 & Pasal 47 Resmi (CV MGM)'"></span>
+                <h2 class="text-xl font-bold text-slate-900 pt-1">Jenis Pelanggaran dan Sanksi</h2>
+                <p class="text-sm text-slate-500">Rincian lengkap Kategori Berat (Poin 1-43), Sedang (Poin 1-25), dan Ringan (Poin 1-18)</p>
+              </div>
+
+              <div class="flex flex-wrap gap-2 border-b pb-3">
+                <button @click="sanksiTab = 'ringkasan'" :class="sanksiTab === 'ringkasan' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">Ringkasan Sanksi</button>
+                <button @click="sanksiTab = 'berat'" :class="sanksiTab === 'berat' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">Pelanggaran Berat (43 Poin)</button>
+                <button @click="sanksiTab = 'sedang'" :class="sanksiTab === 'sedang' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">Pelanggaran Sedang (25 Poin)</button>
+                <button @click="sanksiTab = 'ringan'" :class="sanksiTab === 'ringan' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition">Pelanggaran Ringan (18 Poin)</button>
+              </div>
+
+              <!-- 1. RINGKASAN SANKSI -->
+              <div x-show="sanksiTab === 'ringkasan'" class="space-y-4 animate-fade-in">
+                <div class="border-l-4 p-4 rounded-r-xl bg-blue-50 border-blue-500 text-blue-900">
+                  <div class="flex items-center gap-2 font-bold mb-1">
+                    <i data-lucide="shield-alert" class="w-5 h-5"></i> Ketentuan Umum Sanksi (<span x-text="currentUser.branch === 'PT_MKK' ? 'Pasal 41 Ayat 1-5' : 'Pasal 34 Ayat 1-5'"></span>)
+                  </div>
+                  <p class="text-xs leading-relaxed">
+                    Sanksi diberikan sesuai bobot dan besar kecilnya dampak kerugian perusahaan. Karyawan yang mendapat SP berdampak pada Performance Appraisal (PA), tidak diberikan insentif, bonus, dan kenaikan gaji. Jika menimbulkan kerugian finansial, karyawan wajib mengganti kerugian tersebut.
+                  </p>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs text-left border border-slate-200">
+                    <thead class="bg-slate-100 text-slate-800 uppercase font-semibold">
+                      <tr>
+                        <th class="p-2.5 border border-slate-200 w-12 text-center">No</th>
+                        <th class="p-2.5 border border-slate-200">Kategori Pelanggaran</th>
+                        <th class="p-2.5 border border-slate-200">Bentuk Sanksi Utama & Dampak Administratif</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-slate-700">
+                      <tr>
+                        <td class="p-2.5 border border-slate-200 text-center font-bold">1</td>
+                        <td class="p-2.5 border border-slate-200 font-semibold text-rose-600">Pelanggaran Berat</td>
+                        <td class="p-2.5 border border-slate-200">Pemutusan Hubungan Kerja (PHK) dan dapat diproses secara hukum.</td>
+                      </tr>
+                      <tr>
+                        <td class="p-2.5 border border-slate-200 text-center font-bold">2</td>
+                        <td class="p-2.5 border border-slate-200 font-semibold text-amber-600">Pelanggaran Sedang (Kelalaian / Negligence)</td>
+                        <td class="p-2.5 border border-slate-200">Surat Peringatan (SP3) disertai penundaan kenaikan gaji, penundaan promosi, demosi, skorsing; atau Surat Peringatan (SP2) yang mengurangi nilai PA.</td>
+                      </tr>
+                      <tr>
+                        <td class="p-2.5 border border-slate-200 text-center font-bold">3</td>
+                        <td class="p-2.5 border border-slate-200 font-semibold text-blue-600">Pelanggaran Ringan (Indisipliner)</td>
+                        <td class="p-2.5 border border-slate-200">Peringatan Pertama (SP1) / Surat Teguran.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 2. PELANGGARAN BERAT (43 POIN) -->
+              <div x-show="sanksiTab === 'berat'" class="space-y-4 animate-fade-in">
+                <div class="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 font-medium">
+                  Daftar lengkap 43 jenis tindakan yang dikategorikan sebagai Pelanggaran Berat dengan sanksi utama <strong>PHK</strong>.
+                </div>
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto border border-slate-200 rounded-lg">
+                  <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-slate-800 uppercase font-semibold sticky top-0">
+                      <tr>
+                        <th class="p-2.5 border-b w-12 text-center">No</th>
+                        <th class="p-2.5 border-b">Bentuk Pelanggaran Berat</th>
+                        <th class="p-2.5 border-b w-28 text-center">Sanksi</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-slate-700">
+                      <template x-for="item in pelanggaranBeratList" :key="item.no">
+                        <tr :class="item.no === 43 ? 'bg-rose-50/70 font-semibold' : ''">
+                          <td class="p-2.5 text-center" x-text="item.no"></td>
+                          <td class="p-2.5" x-text="item.desc"></td>
+                          <td class="p-2.5 text-center font-semibold text-rose-600" x-text="item.sanksi"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 3. PELANGGARAN SEDANG (25 POIN) -->
+              <div x-show="sanksiTab === 'sedang'" class="space-y-4 animate-fade-in">
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 font-medium">
+                  Daftar lengkap 25 jenis kelalaian/ketidaksengajaan (Negligence) dengan sanksi SP3 atau SP2.
+                </div>
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto border border-slate-200 rounded-lg">
+                  <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-slate-800 uppercase font-semibold sticky top-0">
+                      <tr>
+                        <th class="p-2.5 border-b w-12 text-center">No</th>
+                        <th class="p-2.5 border-b">Bentuk Pelanggaran Sedang</th>
+                        <th class="p-2.5 border-b w-24 text-center">Sanksi</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-slate-700">
+                      <template x-for="item in pelanggaranSedangList" :key="item.no">
+                        <tr>
+                          <td class="p-2.5 text-center" x-text="item.no"></td>
+                          <td class="p-2.5" x-text="item.desc"></td>
+                          <td class="p-2.5 text-center font-semibold text-amber-600" x-text="item.sanksi"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 4. PELANGGARAN RINGAN (18 POIN LENGKAP) -->
+              <div x-show="sanksiTab === 'ringan'" class="space-y-4 animate-fade-in">
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 font-medium">
+                  Daftar lengkap 18 jenis pelanggaran indisipliner ringan dengan sanksi SP1 / Surat Teguran.
+                </div>
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto border border-slate-200 rounded-lg">
+                  <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-100 text-slate-800 uppercase font-semibold sticky top-0">
+                      <tr>
+                        <th class="p-2.5 border-b w-12 text-center">No</th>
+                        <th class="p-2.5 border-b">Bentuk Pelanggaran Ringan (Indisipliner)</th>
+                        <th class="p-2.5 border-b w-24 text-center">Sanksi</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-slate-700">
+                      <template x-for="item in pelanggaranRinganList" :key="item.no">
+                        <tr>
+                          <td class="p-2.5 text-center" x-text="item.no"></td>
+                          <td class="p-2.5" x-text="item.desc"></td>
+                          <td class="p-2.5 text-center font-semibold text-blue-600" x-text="item.sanksi"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB 3: PERNYATAAN KEPATUHAN DIGITAL -->
+            <div x-show="activeTab === 'kepatuhan' && currentUser.role !== 'admin'" class="bg-white/95 backdrop-blur-sm p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200 space-y-6">
+              <div class="border-b pb-4">
+                <h2 class="text-xl font-bold text-slate-900">Pernyataan Kepatuhan Karyawan</h2>
+                <p class="text-sm font-semibold" :class="currentUser.branch === 'PT_MKK' ? 'text-blue-700' : 'text-rose-700'" x-text="activeBranchData.name"></p>
+              </div>
+
+              <!-- TEKS PERNYATAAN RESMI SESUAI DOKUMEN -->
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 text-xs text-slate-700 space-y-3 leading-relaxed">
+                <p>Saya yang bertandatangan di bawah ini menyatakan telah menerima, membaca dan memahami sepenuhnya Peraturan Perusahaan <strong x-text="activeBranchData.name"></strong>. Selanjutnya saya berjanji untuk mematuhi dan melaksanakan isi Peraturan Perusahaan ini, dengan berupaya:</p>
+                <ol class="list-decimal pl-5 space-y-1.5">
+                  <li>Mendukung penegakan kode etik serta menjunjung tinggi integritas dan profesionalisme di lingkungan <span x-text="activeBranchData.name"></span>.</li>
+                  <li>Melaksanakan pekerjaan sesuai dengan tugas dan tanggung jawabnya serta prosedur yang berlaku.</li>
+                  <li>Berlaku jujur, adil dan bijaksana dalam segala situasi dan akan bekerja secara profesional.</li>
+                  <li>Berupaya menghindari dan mencegah terjadinya benturan kepentingan, antara kepentingan pribadi dengan perusahaan.</li>
+                  <li>Tidak akan melakukan tindakan penyimpangan yang dapat merugikan baik secara finansial maupun reputasi perusahaan.</li>
+                  <li>Menjaga hubungan baik sesama individu di perusahaan serta mendahulukan/mengutamakan kepentingan perusahaan di atas kepentingan pribadi maupun kelompok.</li>
+                  <li>Selalu bertanggungjawab untuk menjaga data dan informasi yang menjadi rahasia perusahaan dan tidak memanfaatkan data dan informasi tersebut untuk meraih keuntungan pribadi atau pihak lain.</li>
+                  <li>Mematuhi semua ketentuan dan kebijakan serta peraturan perundang-undangan yang berlaku.</li>
+                  <li>Tidak bekerja/mengikatkan diri dalam hubungan kerja dengan perusahaan lain.</li>
+                </ol>
+                <p class="pt-1 font-medium text-slate-800">Demikian pernyataan ini saya buat dengan sesungguhnya dan dalam keadaan sehat serta tanpa paksaan, apabila di kemudian hari saya melanggar pernyataan di atas atau melakukan sesuatu yang menyimpang dari peraturan perusahaan, maka saya bersedia menerima sanksi yang diberikan dan atau bersedia mengundurkan diri dengan sukarela, sesuai ketentuan yang berlaku.</p>
+              </div>
+
+              <form @submit.prevent="submitSignature()" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div><label class="block text-xs font-semibold text-slate-600 mb-1">Nama Lengkap</label><input type="text" x-model="currentUser.name" readonly class="w-full p-2.5 text-sm bg-slate-100 border rounded-lg"></div>
+                  <div><label class="block text-xs font-semibold text-slate-600 mb-1">NIK</label><input type="text" x-model="currentUser.nik" readonly class="w-full p-2.5 text-sm bg-slate-100 border rounded-lg"></div>
+                  <div><label class="block text-xs font-semibold text-slate-600 mb-1">Jabatan / Bagian</label><input type="text" x-model="currentUser.position" readonly class="w-full p-2.5 text-sm bg-slate-100 border rounded-lg"></div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Tanda Tangan Digital</label>
+                  <div class="border border-slate-300 rounded-lg bg-slate-50 overflow-hidden">
+                    <canvas id="signature-canvas" width="600" height="160" class="w-full h-40 bg-white cursor-crosshair block touch-none"></canvas>
+                    <div class="p-2 bg-slate-100 flex justify-between items-center text-xs">
+                      <span class="text-slate-500">Tanda tangani di area putih di atas</span>
+                      <button type="button" @click="clearSignature()" class="text-rose-600 font-semibold hover:underline">Bersihkan</button>
+                    </div>
+                  </div>
+                </div>
+                <button type="submit" class="w-full py-3 text-white font-semibold rounded-lg shadow-sm transition" :class="currentUser.branch === 'PT_MKK' ? 'bg-blue-800 hover:bg-blue-900' : 'bg-rose-600 hover:bg-rose-700'">Simpan Pernyataan Kepatuhan</button>
+              </form>
+              <div x-show="submitted" class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-center text-xs font-semibold text-emerald-800">
+                Pernyataan kepatuhan berhasil disimpan dan tercatat di log HRD!
+              </div>
+            </div>
+
+            <!-- ADMIN PANEL 1: LOG KEPATUHAN -->
+            <div x-show="currentUser.role === 'admin' && activeTab === 'admin_dashboard'" class="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+              <div>
+                <h2 class="text-xl font-bold text-slate-900">Panel Admin - Log Kepatuhan Karyawan</h2>
+                <p class="text-xs text-slate-500">Pantau status pembacaan & tanda tangan pernyataan kepatuhan per unit perusahaan</p>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-600 border border-slate-200">
+                  <thead class="bg-slate-100 text-xs uppercase text-slate-700">
+                    <tr>
+                      <th class="p-3 border-b">Nama</th>
+                      <th class="p-3 border-b">NIK</th>
+                      <th class="p-3 border-b">Jabatan</th>
+                      <th class="p-3 border-b">Unit</th>
+                      <th class="p-3 border-b">Status TTD</th>
+                      <th class="p-3 border-b">Waktu TTD</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200">
+                    <template x-for="emp in employeesList" :key="emp.nik">
+                      <tr>
+                        <td class="p-3 font-medium text-slate-900" x-text="emp.name"></td>
+                        <td class="p-3" x-text="emp.nik"></td>
+                        <td class="p-3" x-text="emp.position || '-'"></td>
+                        <td class="p-3">
+                          <span class="text-xs font-semibold px-2 py-0.5 rounded" :class="emp.branch === 'PT_MKK' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'" x-text="emp.branch"></span>
+                        </td>
+                        <td class="p-3">
+                          <span class="text-xs font-semibold px-2 py-0.5 rounded-full" :class="emp.signed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" x-text="emp.signed ? 'Sudah TTD' : 'Belum TTD'"></span>
+                        </td>
+                        <td class="p-3 text-xs text-slate-500" x-text="emp.signedAt || '-'"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- ADMIN PANEL 2: KIRIM NOTIFIKASI UPDATE PERATURAN -->
+            <div x-show="currentUser.role === 'admin' && activeTab === 'admin_notif'" class="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+              <div>
+                <h2 class="text-xl font-bold text-slate-900">Kirim Notifikasi & Pengumuman Revisi Peraturan</h2>
+                <p class="text-xs text-slate-500">Notifikasi akan otomatis muncul di beranda dan lonceng notifikasi karyawan sesuai unit yang dipilih.</p>
+              </div>
+
+              <form @submit.prevent="publishNotification()" class="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Target Unit Perusahaan</label>
+                    <select x-model="notifForm.targetBranch" class="w-full p-2.5 text-sm bg-white border border-slate-300 rounded-lg">
+                      <option value="ALL">Semua Unit (PT MKK & CV MGM)</option>
+                      <option value="PT_MKK">Khusus PT Medika Kesehatan Kerja (PT MKK)</option>
+                      <option value="CV_MGM">Khusus CV Medika Group Mandiri (CV MGM)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Judul Pembaruan / Pasal Terkait</label>
+                    <input type="text" x-model="notifForm.title" required placeholder="Contoh: Revisi Pasal 24 Hak Cuti Tahunan" class="w-full p-2.5 text-sm bg-white border border-slate-300 rounded-lg">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Ringkasan Perubahan Peraturan</label>
+                  <textarea x-model="notifForm.message" rows="3" required placeholder="Tuliskan poin perubahan peraturan agar segera dibaca karyawan..." class="w-full p-2.5 text-sm bg-white border border-slate-300 rounded-lg"></textarea>
+                </div>
+                <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-2">
+                  <i data-lucide="send" class="w-4 h-4"></i> Publikasikan Notifikasi ke Karyawan
+                </button>
+              </form>
+
+              <div class="space-y-3">
+                <h3 class="text-sm font-bold text-slate-800">Riwayat Notifikasi Terkirim</h3>
+                <div class="space-y-2">
+                  <template x-for="n in notifications" :key="n.id">
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-white flex items-start justify-between gap-4">
+                      <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                          <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800" x-text="n.targetBranch"></span>
+                          <span class="text-xs font-bold text-slate-900" x-text="n.title"></span>
+                          <span class="text-[11px] text-slate-400" x-text="n.date"></span>
+                        </div>
+                        <p class="text-xs text-slate-600" x-text="n.message"></p>
+                      </div>
+                      <button @click="deleteNotification(n.id)" class="text-xs text-rose-600 hover:underline font-semibold">Hapus</button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- ADMIN PANEL 3: SETTING LOGO -->
+            <div x-show="currentUser.role === 'admin' && activeTab === 'admin_settings'" class="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
+              <h2 class="text-xl font-bold text-slate-900">Pengaturan & Upload Logo / Animasi GIF</h2>
+              <p class="text-sm text-slate-500">Pilih file gambar atau animasi (.gif) untuk halaman login dan masing-masing unit perusahaan</p>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="p-4 border rounded-xl bg-slate-50 space-y-3">
+                  <h3 class="font-bold text-slate-900">Logo Halaman Login</h3>
+                  <div class="flex items-center gap-4">
+                    <img :src="loginLogo" class="w-12 h-12 object-contain bg-white border rounded-lg p-1">
+                    <input type="file" accept="image/*,.gif" @change="uploadLoginLogo($event)" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-emerald-600 file:text-white hover:file:bg-emerald-700">
+                  </div>
+                </div>
+
+                <div class="p-4 border rounded-xl bg-blue-50/50 space-y-3">
+                  <h3 class="font-bold text-blue-900">Logo PT MKK</h3>
+                  <div class="flex items-center gap-4">
+                    <img :src="branches.PT_MKK.logo" class="w-12 h-12 object-contain bg-white border rounded-lg p-1">
+                    <input type="file" accept="image/*,.gif" @change="uploadLogo($event, 'PT_MKK')" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                  </div>
+                </div>
+
+                <div class="p-4 border rounded-xl bg-rose-50/50 space-y-3">
+                  <h3 class="font-bold text-rose-900">Logo CV MGM</h3>
+                  <div class="flex items-center gap-4">
+                    <img :src="branches.CV_MGM.logo" class="w-12 h-12 object-contain bg-white border rounded-lg p-1">
+                    <input type="file" accept="image/*,.gif" @change="uploadLogo($event, 'CV_MGM')" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-red-600 file:text-white hover:file:bg-red-700">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </section>
+        </div>
+      </main>
+    </div>
+  </template>
+
+  <script>
+    function appData() {
+      return {
+        isLoggedIn: false,
+        activeTab: 'bacapp',
+        selectedBab: null,
+        sanksiTab: 'ringkasan',
+        searchQuery: '',
+        submitted: false,
+        showNotifDrawer: false,
+        bannerDismissed: false,
+        greetingText: 'Selamat Datang',
+        loginLogo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" rx="20" fill="%2310b981"/><text x="50" y="58" font-size="32" font-family="Arial" font-weight="bold" fill="white" text-anchor="middle">MG</text></svg>',
+        loginForm: { branch: 'PT_MKK', name: '', nik: '', position: '' },
+        currentUser: null,
+        notifForm: { targetBranch: 'ALL', title: '', message: '' },
+        notifications: [
+          {
+            id: 1,
+            targetBranch: 'ALL',
+            title: 'Pemberlakuan Peraturan Perusahaan Edisi Juni 2026',
+            message: 'Peraturan Perusahaan terbaru (ditetapkan 8 Juni 2026) telah resmi berlaku. Seluruh karyawan wajib membaca dan menandatangani Pernyataan Kepatuhan.',
+            date: '08 Jun 2026'
+          }
+        ],
+        employeesList: [
+          { name: 'Dr. Budi Santoso', nik: 'MKK-001', position: 'Dokter Umum', branch: 'PT_MKK', signed: true, signedAt: '09 Jun 2026 09:15' },
+          { name: 'Siti Rahma, Amd.Kep', nik: 'MGM-001', position: 'Perawat Klinik', branch: 'CV_MGM', signed: false, signedAt: '-' }
+        ],
+        branches: {
+          PT_MKK: {
+            name: 'PT. Medika Kesehatan Kerja (Medika OHC)',
+            shortName: 'PT Medika Kesehatan Kerja',
+            leader: 'Dr. Arief Wahyu Mulyana, MKK (Direktur)',
+            workHours: '08:00 - 17:00 WIB (Senin - Jumat)',
+            absentMethod: 'HRIS System',
+            totalPasal: 'Pasal 1 - 61',
+            logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" rx="20" fill="%232563eb"/><text x="50" y="58" font-size="28" font-family="Arial" font-weight="bold" fill="white" text-anchor="middle">MKK</text></svg>'
+          },
+          CV_MGM: {
+            name: 'CV. Medika Group Mandiri (Medika Group)',
+            shortName: 'CV Medika Group Mandiri',
+            leader: 'Dr. Said Rizal (Pimpinan Perusahaan)',
+            workHours: '09:00 - 17:00 WIB (Senin - Jumat)',
+            absentMethod: 'Fingerprint',
+            totalPasal: 'Pasal 1 - 53',
+            logo: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" rx="20" fill="%23e11d48"/><text x="50" y="58" font-size="28" font-family="Arial" font-weight="bold" fill="white" text-anchor="middle">MGM</text></svg>'
+          }
+        },
+        activeBranchData: {},
+
+        // DATA PERATURAN LENGKAP PER UNIT PERUSAHAAN
+        rulesByBranch: {
+          // =========================================================================
+          // 1. PT MEDIKA KESEHATAN KERJA (BAB I - XIV, PASAL 1 - 61)
+          // =========================================================================
+          PT_MKK: [
+            {
+              id: 'mkk-bab-1',
+              babLabel: 'BAB I',
+              pasalRange: 'Kata Pengantar & Latar Belakang',
+              title: 'PENDAHULUAN',
+              summary: 'Kata pengantar Direktur, latar belakang, serta tujuan filosofis penyusunan Peraturan Perusahaan.',
+              content: `
+                <div class="bg-blue-50/70 border border-blue-200 p-4 rounded-xl space-y-2 text-xs text-slate-700">
+                  <h4 class="font-bold text-blue-900 text-sm">KATA PENGANTAR DIREKTUR</h4>
+                  <p>Peraturan Perusahaan merupakan sarana mutlak yang sangat penting dalam mewujudkan hubungan kerja yang harmonis antara pengusaha dan karyawan. Langkah strategis yang menjadi perhatian bersama yaitu <strong>Efisiensi, Profitabilitas, Inovasi, dan Kerja Keras</strong>.</p>
+                  <p class="font-semibold text-slate-800 pt-1">— Dr. Arief Wahyu Mulyana, MKK (Direktur)</p>
+                </div>
+                <div class="space-y-2">
+                  <h4 class="font-bold text-slate-900 text-base border-b pb-1">LATAR BELAKANG</h4>
+                  <p>Peraturan Perusahaan adalah ketentuan yang wajib dimiliki oleh perusahaan yang dibuat secara tertulis, mengatur tata tertib perusahaan, memuat hak dan kewajiban karyawan dan pengusaha, serta syarat-syarat kerja dan ketentuan pokok yang berlaku di perusahaan.</p>
+                  <p>Tujuannya adalah menjamin keseimbangan antara hak dan kewajiban karyawan dan pengusaha, memberikan pedoman dalam melaksanakan tugas, menciptakan hubungan kerja yang harmonis, aman, dan dinamis, serta membangun budaya kerja berdasarkan nilai-nilai etika tertinggi, integritas, rasa saling menghargai, dan profesionalisme.</p>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-2',
+              babLabel: 'BAB II',
+              pasalRange: 'Pasal 1',
+              title: 'PENGERTIAN UMUM',
+              summary: 'Definisi istilah Perusahaan (Medika OHC), Upah, Masa Kerja, Shift, Lembur, Cuti, Mutasi, Promosi, Demosi, dan PHK.',
+              content: `
+                <div class="space-y-3">
+                  <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 1: DEFINISI DAN ISTILAH</h4>
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li><strong>Perusahaan:</strong> PT. Medika Kesehatan Kerja, yang selanjutnya disebut “Medika OHC”, yang berkedudukan dan berkantor pusat di Jakarta.</li>
+                    <li><strong>Peraturan Perusahaan:</strong> Peraturan yang dibuat secara tertulis oleh pengusaha yang memuat hak dan kewajiban pengusaha maupun karyawan, syarat-syarat kerja dan tata tertib yang berlaku di perusahaan.</li>
+                    <li><strong>Peraturan Ketenagakerjaan:</strong> Setiap undang-undang, peraturan-peraturan dan ketentuan-ketentuan lainnya yang dikeluarkan oleh instansi resmi Pemerintah Republik Indonesia yang berkaitan dengan bidang ketenagakerjaan.</li>
+                    <li><strong>Ketenagakerjaan:</strong> Segala hal yang berhubungan dengan karyawan pada waktu sebelum, selama, dan sesudah masa kerja.</li>
+                    <li><strong>Karyawan:</strong> Tenaga kerja yang bekerja dan terikat secara formal dalam suatu hubungan kerja dengan pengusaha dan oleh karenanya menerima upah atau imbalan dalam bentuk lain.</li>
+                    <li><strong>Upah:</strong> Hak karyawan yang diterima dan dinyatakan dalam bentuk uang sebagai imbalan dari pengusaha atau pemberi kerja kepada karyawan termasuk tunjangan bagi karyawan dan keluarganya.</li>
+                    <li><strong>Upah Pokok:</strong> Gaji pokok tanpa tunjangan-tunjangan.</li>
+                    <li><strong>Masa Kerja:</strong> Jangka waktu karyawan bekerja di perusahaan secara terus menerus dihitung sejak tanggal mulai bekerja sampai tanggal efektif hubungan kerja berakhir.</li>
+                    <li><strong>Karyawan Bergilir/Shift:</strong> Karyawan yang bekerja bergantian untuk menjalankan pekerjaannya.</li>
+                    <li><strong>Kerja Lembur:</strong> Pekerjaan yang dilakukan di luar waktu kerja atau jadwal kerja normal sehingga jumlah jam kerja dalam satu minggu berjalan lebih dari 40 (empat puluh) jam, kecuali karyawan di lokasi dengan jadwal tertentu.</li>
+                    <li><strong>Hari Libur Resmi:</strong> Hari libur nasional yang ditetapkan oleh Pemerintah Republik Indonesia.</li>
+                    <li><strong>Cuti Tahunan:</strong> Hari libur/istirahat dari pekerjaan yang menjadi hak karyawan setelah bekerja 12 (dua belas) bulan secara terus menerus.</li>
+                    <li><strong>Mutasi:</strong> Perpindahan karyawan dari satu bagian ke bagian lain sesuai kebutuhan perusahaan.</li>
+                    <li><strong>Promosi:</strong> Kenaikan jabatan karyawan yang direkomendasikan atasan/kepala bagian dan ditetapkan oleh Direktur untuk mengisi jabatan lebih tinggi.</li>
+                    <li><strong>Demosi:</strong> Perpindahan karyawan ke bagian/jabatan yang lebih rendah tingkatnya sebagai hukuman karena melanggar peraturan perusahaan.</li>
+                    <li><strong>Pemutusan Hubungan Kerja (PHK):</strong> Pengakhiran hubungan kerja karena suatu hal tertentu yang mengakibatkan berakhirnya hubungan kerja, hak, dan kewajiban.</li>
+                    <li><strong>Cuti Hamil & Melahirkan:</strong> Cuti yang diberikan perusahaan mengikuti ketentuan peraturan pemerintah.</li>
+                  </ol>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-3',
+              babLabel: 'BAB III',
+              pasalRange: 'Pasal 2 - 3',
+              title: 'TUJUAN DAN RUANG LINGKUP',
+              summary: 'Tujuan penyusunan PP (Pasal 2) dan ruang lingkup pemberlakuan bagi karyawan tetap, kontrak, dan pihak ketiga (Pasal 3).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 2: TUJUAN PERATURAN PERUSAHAAN</h4>
+                    <ol class="list-decimal pl-5 space-y-1">
+                      <li>Menetapkan tata tertib yang berlaku di perusahaan.</li>
+                      <li>Mengatur dan menjelaskan hak dan kewajiban pengusaha dan karyawan.</li>
+                      <li>Menetapkan ketentuan dan persyaratan kerja bagi karyawan.</li>
+                      <li>Menciptakan hubungan kerja yang baik, harmonis dan dinamis antara pengusaha dan karyawan.</li>
+                      <li>Menjamin harkat hidup dan kesejahteraan karyawan dan keluarganya.</li>
+                      <li>Menjadi pedoman dalam melakukan pembinaan dan pemberian sanksi terhadap karyawan yang melakukan pelanggaran.</li>
+                      <li>Menjamin kelangsungan dan kelancaran jalannya usaha perusahaan.</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 3: RUANG LINGKUP PERATURAN PERUSAHAAN</h4>
+                    <ol class="list-decimal pl-5 space-y-1">
+                      <li>Kebijakan dan ketentuan-ketentuan pokok tanpa mengurangi segala hak dan kewajiban pengusaha maupun karyawan berdasarkan peraturan ketenagakerjaan.</li>
+                      <li>Hak dan wewenang pengusaha untuk menjabarkan ketentuan lebih lanjut dalam aturan pelaksanaan sesuai kebutuhan perusahaan.</li>
+                      <li>Hal-hal yang bersifat khusus dan teknis yang belum cukup diatur akan ditetapkan dengan Memorandum dan/atau Surat Keputusan Direktur.</li>
+                      <li>Sepanjang tidak diatur dalam Peraturan Perusahaan ini, berlaku ketentuan perundang-undangan Pemerintah yang berlaku.</li>
+                      <li>Peraturan Perusahaan ini berlaku bagi seluruh <strong>karyawan tetap, kontrak, dan pihak ketiga</strong>.</li>
+                    </ol>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-4',
+              babLabel: 'BAB IV',
+              pasalRange: 'Pasal 4 - 15',
+              title: 'HUBUNGAN KERJA DAN PENGEMBANGAN KARYAWAN',
+              summary: 'Perjanjian kerja, rekrutmen, masa percobaan 3 bulan, larangan rekrutmen keluarga, pernikahan sesama karyawan, mutasi, promosi/demosi, hingga usia pensiun (56 tahun).',
+              content: `
+                <div class="space-y-5">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 4: PERSYARATAN DAN PERJANJIAN KERJA</h4>
+                    <p class="mb-1"><strong>1. Persyaratan Penerimaan:</strong> WNI, usia minimal 18 tahun, sehat jasmani & rohani, berkelakuan baik, memenuhi kualifikasi jabatan, lulus seleksi, bersedia ditempatkan di seluruh wilayah RI, serta menandatangani surat perjanjian kerja dan mematuhi kode etik.</p>
+                    <p class="mb-1"><strong>2-4. Jenis Perjanjian Kerja:</strong> Dibuat tertulis sesuai UU, meliputi <strong>PKWT</strong> (Kontrak) dan <strong>PKWTT</strong> (Tetap, dapat melalui masa percobaan maksimal 3 bulan).</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 5: PENERIMAAN KARYAWAN</h4>
+                    <p>Penerimaan didasarkan pada <em>Manpower Planning</em> (MPP) melalui sumber <strong>Internal</strong> (mutasi, promosi, <em>Internal Job Posting</em>) dan <strong>Eksternal</strong> (Campus Hiring, jasa rekrutmen, iklan media, website, referensi karyawan, dan <em>Walk-In Applicant</em>). Kandidat lulus seleksi diberikan <em>Offering Letter</em>.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 6: KARYAWAN DALAM MASA PERCOBAAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Masa percobaan calon karyawan tetap paling lama <strong>3 (tiga) bulan</strong> dan tidak dapat diperpanjang.</li>
+                      <li>Selama masa percobaan, hubungan kerja dapat diakhiri sewaktu-waktu dengan pembayaran upah sampai hari terakhir bekerja.</li>
+                      <li>Usulan pengangkatan tetap disampaikan pimpinan unit ke SDM maksimal <strong>14 hari kerja</strong> sebelum masa percobaan berakhir (dihitung sebagai masa kerja). Pemberitahuan tidak lulus maksimal <strong>7 hari kerja</strong> sebelum berakhir.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 7: REKRUTMEN TERHADAP KELUARGA KARYAWAN</h4>
+                    <p>Perusahaan melarang merekrut calon karyawan dengan ikatan keluarga langsung (ayah, ibu, mertua, suami/istri, kakak, adik, anak, menantu). Jika terbukti mengajak keluarga langsung masuk bekerja, keduanya wajib mengundurkan diri secara sukarela. Keluarga dekat di luar keluarga langsung diperbolehkan selama tidak ada benturan kepentingan dan dideklarasikan saat melamar.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 8: PENEMPATAN DAN PENUGASAN KARYAWAN</h4>
+                    <p>Penempatan sesuai kualifikasi jabatan. Penugasan sementara (Pjs) dapat ditunjuk untuk mengisi kekosongan. Penugasan ke luar <em>homebase</em> mendapat fasilitas luar homebase (kecuali sudah ditanggung klien). Anggota keluarga langsung/dekat dilarang bekerja dalam satu bagian, hubungan atasan-bawahan, satu kantor, atau unit kerja yang sama.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 9: PERNIKAHAN SESAMA KARYAWAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Diperbolehkan dengan syarat melapor ke atasan dan HRD minimal <strong>1 (satu) bulan</strong> sebelum acara pernikahan, serta keduanya sudah berstatus karyawan tetap.</li>
+                      <li>Setelah menikah dilarang berada dalam satu unit/bagian atau atasan-bawahan. Penyesuaian lokasi kerja maksimal <strong>2 (dua) bulan</strong> setelah menikah; jika tidak dilakukan penyesuaian, salah satu wajib mengundurkan diri secara sukarela.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 10 & 11: PENDIDIKAN, PELATIHAN & PENGEMBANGAN KARIR</h4>
+                    <p>Perusahaan menyelenggarakan program pelatihan internal/eksternal dan berhak menetapkan kewajiban <strong>ikatan dinas</strong> beserta sanksi pengembalian biaya pelatihan. Pengajuan pelatihan oleh karyawan wajib disampaikan minimal <strong>10 hari kerja</strong> sebelum pelatihan dimulai.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 12: PENILAIAN KINERJA KARYAWAN</h4>
+                    <p>Penilaian kinerja mengacu pada sasaran kerja dan <strong>Key Performance Indicator (KPI)</strong> secara objektif dan transparan minimal <strong>2 (dua) kali setahun</strong> (tengah tahun dan akhir tahun) melalui diskusi tatap muka tertutup. Hasilnya menjadi dasar kenaikan grade/pangkat, gaji, dan bonus. Karyawan yang tidak mencapai target wajib diberi bimbingan; jika tetap tidak tercapai dapat diberikan SP hingga PHK.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 13 & 14: MUTASI, ROTASI, PROMOSI & DEMOSI</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Karyawan wajib menerima perintah mutasi/rotasi; penolakan tanpa alasan sah dikualifikasikan menolak perintah kerja/mengundurkan diri.</li>
+                      <li><strong>3 Jenis Promosi:</strong> Peningkatan jabatan, peningkatan grade/pangkat, atau keduanya secara bersamaan berdasarkan KPI, potensi, integritas, pengalaman, dan pelatihan.</li>
+                      <li><strong>Demosi:</strong> Penurunan jabatan/grade/pangkat akibat turunnya prestasi dan kondite kerja.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 15: USIA PENSIUN</h4>
+                    <p>Usia pensiun normal ditetapkan pada usia <strong>56 (lima puluh enam) tahun</strong>. Enam bulan sebelum pensiun, perusahaan dapat memberikan masa persiapan pensiun (MPP) dengan upah penuh. Pensiunan yang masih mampu dan dibutuhkan dapat dipekerjakan kembali melalui skema PKWT atau pekerja lepas.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-5',
+              babLabel: 'BAB V',
+              pasalRange: 'Pasal 16 - 19',
+              title: 'HAK DAN KEWAJIBAN KARYAWAN DAN PENGUSAHA',
+              summary: 'Hak karyawan (upah, cuti, BPJS, bantuan hukum) dan 16 butir kewajiban karyawan (Pasal 16-17), serta hak & kewajiban pengusaha (Pasal 18-19).',
+              content: `
+                <div class="space-y-5">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 16: HAK KARYAWAN</h4>
+                    <ol class="list-decimal pl-5 space-y-1">
+                      <li>Mendapatkan pekerjaan serta tempat dan perangkat kerja yang layak sesuai jabatan.</li>
+                      <li>Memperoleh kesempatan pengembangan karir sesuai kompetensi dan ketersediaan jabatan.</li>
+                      <li>Mendapatkan waktu istirahat kerja dan cuti sesuai ketentuan.</li>
+                      <li>Menerima imbalan berupa gaji, tunjangan, dan pendapatan lain yang sah.</li>
+                      <li>Diikutsertakan dalam program jaminan sosial BPJS Ketenagakerjaan dan BPJS Kesehatan.</li>
+                      <li>Mengemukakan pendapat, usul, dan saran demi perbaikan kinerja dan kemajuan perusahaan.</li>
+                      <li>Memperoleh pembelaan hukum atau biaya penyelesaian dari perusahaan apabila terkena tindakan hukum saat menjalankan tugas perusahaan (kecuali akibat kelalaian karyawan).</li>
+                    </ol>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 17: KEWAJIBAN KARYAWAN (Butir a s/d p)</h4>
+                    <ol class="list-[lower-alpha] pl-5 space-y-1">
+                      <li>Mematuhi dan menaati Peraturan Perusahaan, kebijakan, SOP, tata tertib kerja, dan perundang-undangan.</li>
+                      <li>Bertindak konsisten sesuai nilai budaya perusahaan dan kode etik perilaku.</li>
+                      <li>Mencegah dan menghindari peluang terjadinya benturan kepentingan (<em>conflict of interest</em>).</li>
+                      <li>Tidak melakukan pelanggaran/penyimpangan serta wajib mencegah dan melaporkan jika mengetahui adanya pelanggaran.</li>
+                      <li>Menjaga kerahasiaan data dan informasi perusahaan serta rahasia jabatan.</li>
+                      <li>Mengutamakan keamanan, kesehatan, dan keselamatan kerja (K3) di lingkungan kerja.</li>
+                      <li>Memelihara ketertiban, kebersihan, serta menjaga barang inventaris yang menjadi tanggung jawabnya.</li>
+                      <li>Memahami tugas dan tanggung jawab serta menunjukkan kinerja terbaik untuk mencapai target.</li>
+                      <li>Mendukung penegakan kode etik, integritas, dan profesionalisme.</li>
+                      <li>Melaksanakan tugas sesuai prosedur secara jujur dan tepat.</li>
+                      <li>Memiliki dedikasi dan loyalitas tinggi.</li>
+                      <li>Menjaga hubungan baik antar individu, saling menghormati dan menghargai.</li>
+                      <li>Bersikap, berperilaku, dan berpakaian yang pantas dan sopan.</li>
+                      <li>Menjunjung tinggi kepentingan perusahaan di atas kepentingan pribadi/kelompok.</li>
+                      <li>Menjalankan komitmen hasil pembinaan dari pimpinan unit/atasan.</li>
+                      <li>Mengembalikan seluruh inventaris, surat, catatan, dan dokumen pekerjaan saat terjadi PHK.</li>
+                    </ol>
+                    <p class="mt-2 text-xs text-rose-700 font-medium">*Pelanggaran atas butir a s/d p dapat dikenakan sanksi SP1, SP2, SP3, hingga PHK.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 18 & 19: HAK DAN KEWAJIBAN PENGUSAHA / PERUSAHAAN</h4>
+                    <p class="mb-1"><strong>Hak Pengusaha (Pasal 18):</strong> Memberi perintah kerja, menetapkan kebijakan/SOP, struktur organisasi, grade/kepangkatan, sistem penggajian, mutasi/penempatan, pembinaan & sanksi, promosi/demosi, dan penugasan lembur/shift.</p>
+                    <p><strong>Kewajiban Pengusaha (Pasal 19):</strong> Memelihara K3 karyawan, memberi pelatihan, menaati peraturan, mensosialisasikan PP, memberi bantuan hukum untuk tugas dinas, memperlakukan karyawan tanpa diskriminasi, meningkatkan kesejahteraan, serta mendaftarkan seluruh karyawan ke BPJS Ketenagakerjaan & BPJS Kesehatan.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-6',
+              babLabel: 'BAB VI',
+              pasalRange: 'Pasal 20 - 29',
+              title: 'TATA TERTIB KERJA',
+              summary: 'Jam kerja normal & shift klinik 24 jam, lembur, tata tertib, hari libur, hak cuti tahunan, tabel izin dibayar (Pasal 25), cuti melahirkan, ibadah, izin di luar tanggungan, & istirahat sakit.',
+              content: `
+                <div class="space-y-6">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 20: WAKTU DAN JAM KERJA KARYAWAN</h4>
+                    <ul class="list-disc pl-5 space-y-1 mb-3">
+                      <li><strong>Aturan Normal:</strong> 7 jam/hari (40 jam/minggu) untuk 6 hari kerja, atau 8 jam/hari (40 jam/minggu) untuk 5 hari kerja.</li>
+                      <li><strong>Kantor Pusat Jakarta:</strong> Senin s/d Jumat, Pukul <strong>08:00 – 17:00 WIB</strong> (istirahat 1 jam).</li>
+                      <li><strong>Operasional Klinik 24 Jam (Sistem Shift Senin s/d Minggu):</strong>
+                        <br>• Shift 1: 07:00 – 15:00 WIB
+                        <br>• Shift 2: 15:00 – 23:00 WIB
+                        <br>• Shift 3: 23:00 – 07:00 WIB
+                      </li>
+                      <li><strong>Lokasi Klien Sektor Energi & Sumber Daya Mineral (PP No. 35 Tahun 2021):</strong> Mengikuti pola kerja 9, 10, atau 11 jam/hari dalam periode 5, 7, 10, atau 14 hari kerja sesuai ketentuan klien.</li>
+                      <li>Karyawan wajib melakukan scan kehadiran melalui <strong>sistem HRIS</strong> setiap hari. Saat jam kerja dimulai dilarang masih berganti seragam, berdandan, atau makan di tempat kerja.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 21: WAKTU KERJA LEMBUR</h4>
+                    <p>Lembur dilakukan atas perintah tertulis atasan. Upah lembur berlaku bagi karyawan <strong>Grade Staf atau lebih rendah</strong> (tidak berlaku bagi karyawan yang sudah menerima insentif seperti bagian marketing). Kegiatan training, sosialisasi, rapat dinas, perjalanan dinas, dan undangan instansi tidak termasuk kerja lembur.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 22 & 23: TATA TERTIB KERJA & HARI LIBUR</h4>
+                    <p class="mb-1"><strong>Tata Tertib (Pasal 22):</strong> Wajib memakai seragam dan ID Card resmi, melaporkan kecelakaan kerja, menjaga kebersihan & peralatan, menjaga rahasia perusahaan, dilarang menerima suap/komisi, dilarang bekerja rangkap di perusahaan lain, dilarang berjudi/mabuk, dan wajib lapor perubahan data pribadi.</p>
+                    <p><strong>Hari Libur (Pasal 23):</strong> Mengikuti hari libur nasional Pemerintah, kecuali pelayanan kesehatan/klinik di lokasi klien yang beroperasi terus-menerus.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 24: HAK CUTI TAHUNAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Hak cuti tahunan adalah <strong>12 (dua belas) hari kerja</strong> per tahun (periode Januari–Desember) setelah masa kerja 12 bulan berturut-turut.</li>
+                      <li>Bagi karyawan baru yang masuk tidak di awal tahun, cuti dihitung prorata: <code>(N / 12) × 12</code>.</li>
+                      <li><strong>Syarat Pengambilan:</strong> Karyawan tetap minimal telah bekerja <strong>3 bulan</strong> berturut-turut; Karyawan kontrak minimal <strong>1 tahun</strong> berturut-turut.</li>
+                      <li>Maksimal pengambilan cuti dalam satu kali pengajuan adalah <strong>4 (empat) hari</strong>.</li>
+                      <li>Sisa cuti yang tidak diambil hingga akhir tahun gugur, kecuali karyawan yang baru berhak cuti pada periode Oktober–Desember dapat diperpanjang hingga Maret tahun berikutnya.</li>
+                    </ul>
+                  </div>
+
+                  <div class="space-y-3">
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 25: IZIN MENINGGALKAN PEKERJAAN (TETAP MENERIMA UPAH)</h4>
+                    <p class="text-xs text-slate-600">Karyawan dapat meninggalkan pekerjaan tanpa mengurangi hak cuti tahunan dengan tetap menerima upah penuh dalam peristiwa berikut:</p>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-xs text-left border border-slate-200">
+                        <thead class="bg-slate-100 text-slate-800 uppercase font-semibold">
+                          <tr>
+                            <th class="p-2 border border-slate-200 w-10 text-center">No</th>
+                            <th class="p-2 border border-slate-200">Keperluan Izin Resmi</th>
+                            <th class="p-2 border border-slate-200 text-center">Dalam Kota</th>
+                            <th class="p-2 border border-slate-200 text-center">Luar Kota</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 text-slate-700">
+                          <tr><td class="p-2 border text-center">1</td><td class="p-2 border font-medium">Suami/istri, anak, bapak/ibu kandung, bapak/ibu mertua, saudara kandung meninggal dunia</td><td class="p-2 border text-center">2 hari kerja</td><td class="p-2 border text-center">3 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">2</td><td class="p-2 border">Kematian anggota keluarga lainnya dalam satu rumah</td><td class="p-2 border text-center" colspan="2">1 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">3</td><td class="p-2 border font-medium">Karyawan Menikah</td><td class="p-2 border text-center" colspan="2">3 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">4</td><td class="p-2 border">Istri Melahirkan / Keguguran</td><td class="p-2 border text-center" colspan="2">2 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">5</td><td class="p-2 border">Mengkhitankan / Membaptiskan anak</td><td class="p-2 border text-center" colspan="2">1 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">6</td><td class="p-2 border">Menikahkan anak</td><td class="p-2 border text-center" colspan="2">2 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">7</td><td class="p-2 border">Rumah terkena bencana (banjir, gempa bumi, angin topan, kebakaran, dsb)</td><td class="p-2 border text-center" colspan="2">2 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">8</td><td class="p-2 border font-medium">Menyusui bayinya (s/d usia 9 bulan)</td><td class="p-2 border text-center" colspan="2">2 jam / hari *</td></tr>
+                          <tr><td class="p-2 border text-center">9</td><td class="p-2 border">Menjalankan ibadah haji pertama kali</td><td class="p-2 border text-center" colspan="2">Sesuai ketentuan Pemerintah</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <p class="text-xs text-slate-600">*Pengaturan jadwal menyusui disesuaikan kondisi pekerjaan atas persetujuan atasan. Permohonan izin (kecuali kematian, kelahiran, bencana) wajib diajukan tertulis minimal <strong>2 minggu sebelumnya</strong> dengan bukti sah.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 26 & 27: ISTIRAHAT MELAHIRKAN/KEGUGURAN & IBADAH WAJIB</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Istirahat Melahirkan (Pasal 26):</strong> 1,5 bulan sebelum dan 1,5 bulan setelah melahirkan (diajukan min. 2 minggu sebelumnya dengan surat dokter/bidan). Keguguran mendapat istirahat 1,5 bulan (diajukan maks. 1 minggu setelah kejadian). Tidak memotong cuti tahunan.</li>
+                      <li><strong>Ibadah Wajib Keagamaan (Pasal 27):</strong> Karyawan berhak atas izin dibayar penuh untuk menunaikan ibadah wajib keagamaan.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 28: IZIN DI LUAR TANGGUNGAN PERUSAHAAN (UNPAID LEAVE)</h4>
+                    <p>Dapat diajukan oleh karyawan dengan masa kerja minimal <strong>5 tahun</strong> terus-menerus (pengajuan min. 1 bulan sebelumnya) untuk keperluan studi atau merawat keluarga inti sakit keras, berdurasi minimal <strong>3 bulan</strong> dan maksimal <strong>6 bulan</strong> atas persetujuan Direktur. Selama izin, tidak menerima penghasilan dan tidak dihitung sebagai masa kerja.</p>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 29: ISTIRAHAT SAKIT</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Sakit <strong>1 hari</strong> wajib melapor ke atasan maksimal 1 jam setelah jam kerja dimulai; sakit <strong>2 hari atau lebih</strong> wajib menyerahkan surat keterangan dokter pada hari pertama masuk kembali. Tanpa pemberitahuan dianggap mangkir (SP-1).</li>
+                      <li><strong>Upah Sakit Berkepanjangan (dengan surat dokter):</strong> 4 bulan pertama dibayar 100%, 4 bulan kedua 75%, 4 bulan ketiga 50%, dan bulan selanjutnya 25% sebelum dilakukan PHK.</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-7',
+              babLabel: 'BAB VII',
+              pasalRange: 'Pasal 30 - 32',
+              title: 'IMBAL JASA, PENGELOMPOKAN LEVEL JABATAN, GRADE DAN KEPANGKATAN',
+              summary: 'Komponen imbal jasa (Gaji Pokok, tunjangan tetap/variabel, benefit non-tunai), standar upah minimum, level jabatan, dan sistem grade.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 30: PRINSIP DAN KOMPONEN IMBAL JASA</h4>
+                    <p class="mb-1">Komponen imbal jasa terdiri atas: (a) Gaji Pokok; (b) Tunjangan tetap dan tunjangan lainnya; (c) Bonus dan insentif variabel sesuai prestasi dan kinerja perusahaan; (d) Manfaat (Benefit) non-tunai.</p>
+                    <p>Penetapan gaji terendah tidak kurang dari Upah Minimum Pemerintah, serta memiliki standar upah minimum, tengah, dan maksimum pada setiap grade.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 31 & 32: LEVEL JABATAN, GRADE DAN KEPANGKATAN</h4>
+                    <p>Pengelompokan level jabatan ditentukan berdasarkan keterlibatan dalam keputusan strategis bisnis dan operasional, sedangkan penggolongan grade dan kepangkatan mencerminkan kompetensi, pengalaman, dan jenjang karir karyawan yang diatur dalam ketentuan tersendiri.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-8',
+              babLabel: 'BAB VIII',
+              pasalRange: 'Pasal 33 - 36',
+              title: 'TUNJANGAN',
+              summary: 'Jenis tunjangan (Pasal 33), ketentuan pembayaran THR Keagamaan (Pasal 34), sarana ibadah (Pasal 35), dan perjalanan dinas (Pasal 36).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 33: JENIS TUNJANGAN DAN FASILITAS</h4>
+                    <p>Meliputi Tunjangan Hari Raya (THR) Keagamaan, tunjangan jabatan, tunjangan khusus masa kerja, tunjangan transport, tunjangan kehadiran, dan tunjangan lainnya sesuai kemampuan keuangan perusahaan.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 34: TUNJANGAN HARI RAYA (THR) KEAGAMAAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Dibayarkan setahun sekali selambat-lambatnya <strong>14 (empat belas) hari</strong> sebelum tanggal Hari Raya Keagamaan karyawan.</li>
+                      <li>Masa kerja <strong>3 bulan s/d kurang dari 12 bulan</strong> menerima THR secara proporsional.</li>
+                      <li>Masa kerja <strong>12 bulan atau lebih</strong> berhak atas THR sebesar <strong>1 (satu) bulan Gaji Pokok + Tunjangan Tetap</strong>.</li>
+                      <li>Karyawan tetap yang hubungan kerjanya berakhir dalam waktu 30 hari atau kurang sebelum Hari Raya tetap berhak atas THR (tidak berlaku bagi karyawan kontrak/PKWT yang kontraknya berakhir sebelum Hari Raya).</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 35 & 36: SARANA IBADAH & FASILITAS PERJALANAN DINAS</h4>
+                    <p>Perusahaan menyediakan sarana ibadah yang layak serta menanggung biaya perjalanan dinas/pelatihan individu sesuai ketentuan perusahaan.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-9',
+              babLabel: 'BAB IX',
+              pasalRange: 'Pasal 37 - 38',
+              title: 'PROGRAM BPJS DAN PROGRAM DANA PENSIUN',
+              summary: 'Kepesertaan BPJS Kesehatan dan BPJS Ketenagakerjaan (Pasal 37) serta rencana penyelenggaraan Program Dana Pensiun (Pasal 38).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 37: PROGRAM BPJS</h4>
+                    <p>Pengusaha mengikutsertakan karyawan dalam program jaminan sosial tenaga kerja yang diselenggarakan oleh <strong>BPJS Kesehatan</strong> dan <strong>BPJS Ketenagakerjaan</strong> sesuai peraturan perundang-undangan yang berlaku.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 38: PROGRAM DANA PENSIUN</h4>
+                    <p>Pelaksanaan program pensiun direncanakan sesuai kondisi keuangan perusahaan sebagai bagian untuk menutup kewajiban pembayaran uang pesangon, uang penghargaan masa kerja, dan uang penggantian hak sesuai UU Ketenagakerjaan.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-10',
+              babLabel: 'BAB X',
+              pasalRange: 'Pasal 39',
+              title: 'PINJAMAN KARYAWAN',
+              summary: 'Fasilitas pinjaman karyawan secara selektif untuk membantu kebutuhan tertentu.',
+              content: `
+                <div class="space-y-3">
+                  <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 39: PINJAMAN KARYAWAN</h4>
+                  <ol class="list-decimal pl-5 space-y-1">
+                    <li>Pengusaha memberikan pinjaman karyawan untuk membantu karyawan guna memenuhi kebutuhan tertentu secara selektif.</li>
+                    <li>Jenis pinjaman dan mekanisme serta persyaratan memperoleh pinjaman karyawan diatur dalam ketentuan tersendiri.</li>
+                  </ol>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-11',
+              babLabel: 'BAB XI',
+              pasalRange: 'Pasal 40 - 44',
+              title: 'PEMBINAAN, SANKSI DAN REHABILITASI',
+              summary: 'Pembinaan/coaching, Pasal 41 Jenis Pelanggaran & Sanksi (43 Berat, 25 Sedang, 18 Ringan), masa berlaku SP 6 bulan, Skorsing, dan Rehabilitasi.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 40: PEMBINAAN KARYAWAN</h4>
+                    <p>Setiap pimpinan unit kerja wajib mengawasi dan membina bawahannya melalui <em>coaching</em> & konseling maupun pemberian sanksi. Atasan yang lalai membina bawahannya dapat dikenakan sanksi.</p>
+                  </div>
+                  <div class="bg-rose-50 border border-rose-200 p-4 rounded-xl space-y-2">
+                    <h4 class="font-bold text-rose-900 text-base">Pasal 41: JENIS PELANGGARAN DAN SANKSI</h4>
+                    <p class="text-xs text-slate-700">Pelanggaran terbagi dalam 3 kategori: <strong>Pelanggaran Berat (43 poin — Sanksi PHK)</strong>, <strong>Pelanggaran Sedang (25 poin — SP3 / SP2)</strong>, dan <strong>Pelanggaran Ringan (18 poin — SP1)</strong>. Karyawan yang menerima SP tidak mendapat insentif, bonus, maupun kenaikan gaji dan wajib mengganti kerugian finansial perusahaan.</p>
+                    <button @click="activeTab = 'sanksi'; selectedBab = null" class="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 transition">Buka Tabel Rincian 86 Poin Pasal 41 →</button>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 42: PENETAPAN DAN PELAKSANAAN PEMBERIAN SANKSI</h4>
+                    <p>Pemberian SP1, SP2, SP3, atau PHK dapat dilakukan berurutan maupun langsung sesuai bobot pelanggaran. Masa berlaku setiap SP adalah <strong>6 (enam) bulan</strong>. Pelaksanaan PHK wajib dikoordinasikan dengan HRD dan disetujui Direksi.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 43 & 44: SKORSING DAN REHABILITASI</h4>
+                    <p>Skorsing dapat dikenakan selama proses PHK atau investigasi dugaan tindak pidana/pelanggaran berat dengan tetap memperhatikan ketentuan upah proses. Jika karyawan terbukti tidak bersalah, pengusaha wajib memulihkan nama baiknya (Rehabilitasi).</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-12',
+              babLabel: 'BAB XII',
+              pasalRange: 'Pasal 45 - 46',
+              title: 'PERLINDUNGAN HUKUM DAN KOMITMEN',
+              summary: 'Bantuan advokat bagi karyawan yang menjalankan tugas sesuai SOP (Pasal 45) dan penyelesaian perselisihan hubungan industrial (Pasal 46).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 45: PERLINDUNGAN HUKUM</h4>
+                    <p>Perusahaan menyediakan bantuan pembelaan advokat beserta biayanya (berdasarkan keputusan rapat komite) bagi karyawan yang terlibat perkara hukum saat menjalankan tugas jabatan sesuai SOP dan prinsip kehati-hatian.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 46: KOMITMEN PIHAK-PIHAK</h4>
+                    <p>Pengusaha dan karyawan wajib menaati seluruh isi PP dan menyelesaikan setiap perselisihan hubungan industrial secara musyawarah mufakat / bipartit sebelum menempuh jalur UU No. 2 Tahun 2004 tentang PPHI.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-13',
+              babLabel: 'BAB XIII',
+              pasalRange: 'Pasal 47 - 57',
+              title: 'PEMUTUSAN HUBUNGAN KERJA (PHK)',
+              summary: 'Sebab PHK, komponen upah PHK (Pasal 47A), PHK masa percobaan, resign/habis kontrak, mangkir 5 hari, pensiun, meninggal dunia, sakit berkepanjangan, kesalahan berat, ditahan pihak berwajib, & sebab lainnya.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 47 & 47A: SEBAB PHK & KOMPONEN UPAH DASAR PHK</h4>
+                    <p class="mb-1"><strong>Sebab PHK (Pasal 47):</strong> Tidak lulus masa percobaan, mengundurkan diri, mangkir 5 hari berturut-turut, usia pensiun, meninggal dunia, sakit berkepanjangan, kesalahan berat, pelanggaran PP, ditahan pihak berwajib, atau sebab lain sesuai UU.</p>
+                    <p><strong>Komponen Upah PHK (Pasal 47A):</strong> Hanya terdiri dari <strong>Upah Pokok + Tunjangan Tetap</strong> (tunjangan tidak tetap/bonus/insentif tidak diperhitungkan).</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 48 & 49: PHK MASA PERCOBAAN, RESIGN & HABIS KONTRAK (PKWT)</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Resign (Pasal 49):</strong> Wajib mengajukan surat pengunduran diri minimal <strong>30 hari sebelumnya</strong>, tidak dalam ikatan dinas, dan melakukan serah terima. PKWTT mendapat Uang Penggantian Hak & Uang Pisah sesuai PP 35/2021. PKWT yang resign tanpa memenuhi syarat dikenakan penalti sebesar gaji bersih sejak tanggal mengundurkan diri.</li>
+                      <li><strong>Selesai Kontrak PKWT:</strong> Berhak atas Uang Kompensasi masa kerja minimal 1 bulan secara proporsional: <code>(Masa Kerja / 12) × 1 Bulan Upah</code>.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 50 - 53: MANGKIR, PENSIUN, MENINGGAL DUNIA & SAKIT BERKEPANJANGAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Mangkir (Pasal 50):</strong> Tidak masuk kerja <strong>5 hari kerja atau lebih berturut-turut</strong> tanpa bukti sah dan telah dipanggil tertulis 2 kali dikualifikasikan mengundurkan diri.</li>
+                      <li><strong>Pensiun (Pasal 51):</strong> Mendapat Uang Pesangon, Uang Penghargaan Masa Kerja (UPMK), dan Uang Penggantian Hak sesuai PP 35 Tahun 2021 Pasal 40.</li>
+                      <li><strong>Meninggal Dunia (Pasal 52):</strong> Ahli waris menerima 1x Pesangon, 1x UPMK, Uang Penggantian Hak, Santunan Kematian perusahaan, JKM & JHT BPJS Ketenagakerjaan, serta sisa upah berjalan.</li>
+                      <li><strong>Sakit Berkepanjangan >12 Bulan (Pasal 53):</strong> Diberikan 2x Pesangon, 1x UPMK, dan Uang Penggantian Hak sesuai PP 35 Tahun 2021.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 54 - 57: KESALAHAN BERAT, MENDESAK, DITAHAN & SEBAB LAINNYA</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Kesalahan Berat (Pasal 54):</strong> Perusahaan tidak menerbitkan surat referensi kerja (paklaring).</li>
+                      <li><strong>Pelanggaran Mendesak / SP3 (Pasal 55):</strong> Mendesak mendapat UPH & Uang Pisah; PHK karena SP3 mendapat pesangon 0,5x ketentuan PP 35/2021 Pasal 52 ayat (1).</li>
+                      <li><strong>Ditahan Pihak Berwajib (Pasal 56):</strong> Keluarga tanggungan mendapat bantuan maksimal 6 bulan (1 tanggungan 25%, 2 tanggungan 35%, 3 tanggungan 45%, ≥4 tanggungan 50% upah). Jika diputus setelah 6 bulan/bersalah diberikan Uang Pisah 1 bulan upah & UPH.</li>
+                      <li><strong>Sebab Lainnya (Pasal 57):</strong> Force majeure, pailit, efisiensi, atau ketidakmampuan kerja setelah SP1–SP3 mengacu pada UU Ketenagakerjaan.</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mkk-bab-14',
+              babLabel: 'BAB XIV',
+              pasalRange: 'Pasal 58 - 61',
+              title: 'KETENTUAN PENUTUP',
+              summary: 'Sosialisasi softcopy PP, kewajiban tanda tangan pernyataan kepatuhan, perubahan aturan, dan pengesahan di Jakarta tanggal 8 Juni 2026.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 58 - 61: PEMBERLAKUAN, PERUBAHAN & LAIN-LAIN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Peraturan Perusahaan dibagikan dalam bentuk <em>softcopy</em> kepada seluruh karyawan dan setiap karyawan wajib menandatangani <strong>Surat Pernyataan Kepatuhan</strong>.</li>
+                      <li>Ketentuan teknis yang belum cukup diatur ditetapkan melalui SK, Surat Edaran, atau Memorandum Direktur.</li>
+                      <li>Apabila terdapat pasal yang bertentangan dengan peraturan perundang-undangan yang berlaku, maka batal demi hukum dan yang berlaku adalah undang-undang tersebut.</li>
+                    </ul>
+                  </div>
+                  <div class="bg-slate-100 p-4 rounded-xl text-xs text-slate-700">
+                    <p><strong>Ditetapkan di:</strong> Jakarta, 8 Juni 2026</p>
+                    <p><strong>PT. Medika Kesehatan Kerja</strong> — Dr. Arief Wahyu Mulyana, MKK (Direktur)</p>
+                  </div>
+                </div>
+              `
+            }
+          ],
+
+          // =========================================================================
+          // 2. CV MEDIKA GROUP MANDIRI (BAB I - XIII, PASAL 1 - 53)
+          // =========================================================================
+          CV_MGM: [
+            {
+              id: 'mgm-bab-1',
+              babLabel: 'BAB I',
+              pasalRange: 'Kata Pengantar & Latar Belakang',
+              title: 'PENDAHULUAN',
+              summary: 'Kata pengantar Pimpinan Perusahaan (Dr. Said Rizal), latar belakang, dan tujuan Peraturan Perusahaan CV Medika Group Mandiri.',
+              content: `
+                <div class="bg-rose-50/70 border border-rose-200 p-4 rounded-xl space-y-2 text-xs text-slate-700">
+                  <h4 class="font-bold text-rose-900 text-sm">KATA PENGANTAR PIMPINAN PERUSAHAAN</h4>
+                  <p>Peraturan Perusahaan merupakan sarana mutlak yang sangat penting dalam mewujudkan hubungan kerja yang harmonis antara pengusaha dan karyawan, selaras dengan langkah strategis bersama yaitu <strong>Efisiensi, Profitabilitas, Inovasi, dan Kerja Keras</strong>.</p>
+                  <p class="font-semibold text-slate-800 pt-1">— Dr. Said Rizal (Pimpinan Perusahaan)</p>
+                </div>
+                <div class="space-y-2">
+                  <h4 class="font-bold text-slate-900 text-base border-b pb-1">LATAR BELAKANG</h4>
+                  <p>Peraturan Perusahaan adalah ketentuan tertulis yang mengatur tata tertib perusahaan, memuat hak dan kewajiban karyawan dan pengusaha, serta syarat-syarat kerja yang berlaku di CV Medika Group Mandiri guna membangun budaya integritas, etika tertinggi, dan profesionalisme.</p>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-2',
+              babLabel: 'BAB II',
+              pasalRange: 'Pasal 1',
+              title: 'PENGERTIAN UMUM',
+              summary: 'Definisi Pengusaha/Sekutu Pengurus CV Medika Group Mandiri (Medika Group) dan istilah ketenagakerjaan (Pasal 1 ayat 1–16).',
+              content: `
+                <div class="space-y-3">
+                  <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 1: DEFINISI DAN ISTILAH</h4>
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li><strong>Pengusaha/Pimpinan Perusahaan:</strong> Sekutu Pengurus yang berwenang bertindak untuk dan atas nama <strong>CV Medika Group Mandiri</strong>, yang selanjutnya disebut “Medika Group”, berkedudukan dan berkantor pusat di Jakarta.</li>
+                    <li><strong>Peraturan Perusahaan:</strong> Peraturan tertulis yang memuat hak dan kewajiban pengusaha maupun karyawan, syarat-syarat kerja, dan tata tertib yang berlaku.</li>
+                    <li><strong>Ketenagakerjaan:</strong> Segala hal yang berhubungan dengan karyawan pada waktu sebelum, selama, dan sesudah masa kerja.</li>
+                    <li><strong>Karyawan:</strong> Tenaga kerja yang bekerja dan terikat hubungan kerja formal dengan pengusaha dan menerima upah.</li>
+                    <li><strong>Upah & Upah Pokok:</strong> Imbalan berupa uang termasuk tunjangan (Upah), serta gaji pokok tanpa tunjangan (Upah Pokok).</li>
+                    <li><strong>Masa Kerja:</strong> Jangka waktu karyawan bekerja terus menerus sejak tanggal mulai bekerja hingga hubungan kerja berakhir.</li>
+                    <li><strong>Karyawan Bergilir/Shift & Kerja Lembur:</strong> Karyawan yang bekerja bergantian, serta pekerjaan di luar jadwal normal yang melebihi 40 jam dalam satu minggu berjalan.</li>
+                    <li><strong>Hari Libur Resmi & Cuti Tahunan:</strong> Libur nasional Pemerintah RI, serta hak istirahat tahunan setelah bekerja 12 bulan terus menerus.</li>
+                    <li><strong>Mutasi, Promosi & Demosi:</strong> Perpindahan bagian, kenaikan jabatan oleh Pimpinan Perusahaan, atau penurunan tingkat sebagai hukuman pelanggaran.</li>
+                    <li><strong>Pemutusan Hubungan Kerja (PHK) & Cuti Hamil/Melahirkan:</strong> Pengakhiran hubungan kerja serta hak cuti melahirkan sesuai peraturan pemerintah.</li>
+                  </ol>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-3',
+              babLabel: 'BAB III',
+              pasalRange: 'Pasal 2 - 3',
+              title: 'TUJUAN DAN RUANG LINGKUP',
+              summary: 'Tujuan Peraturan Perusahaan (Pasal 2) dan ruang lingkup pemberlakuan dengan Memorandum/SK Pimpinan Perusahaan (Pasal 3).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 2: TUJUAN PERATURAN PERUSAHAAN</h4>
+                    <p>Menetapkan tata tertib, mengatur hak dan kewajiban, menetapkan syarat kerja, menciptakan hubungan kerja yang harmonis, menjamin kesejahteraan karyawan dan keluarga, menjadi pedoman pembinaan & sanksi, serta menjamin kelangsungan usaha perusahaan.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 3: RUANG LINGKUP PERATURAN PERUSAHAAN</h4>
+                    <p>Mengatur ketentuan pokok tanpa mengurangi hak/kewajiban berdasarkan UU Ketenagakerjaan. Hal teknis diatur tersendiri melalui Memorandum atau <strong>Surat Keputusan Pimpinan Perusahaan</strong>. Berlaku bagi seluruh <strong>karyawan tetap, kontrak, dan pihak ketiga</strong>.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-4',
+              babLabel: 'BAB IV',
+              pasalRange: 'Pasal 4 - 13',
+              title: 'HUBUNGAN KERJA DAN PENGEMBANGAN KARYAWAN',
+              summary: 'Persyaratan & perjanjian kerja, penerimaan karyawan, larangan rekrutmen keluarga, penempatan, pernikahan sesama karyawan, pelatihan, penilaian kinerja, mutasi, serta promosi/demosi.',
+              content: `
+                <div class="space-y-5">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 4 & 5: PERSYARATAN, PERJANJIAN KERJA & PENERIMAAN KARYAWAN</h4>
+                    <p>Syarat calon karyawan: WNI, usia min. 18 tahun, sehat jasmani & rohani, berkelakuan baik, lulus seleksi, bersedia ditempatkan di seluruh wilayah RI. Perjanjian kerja terdiri dari <strong>PKWT</strong> dan <strong>PKWTT</strong> (masa percobaan maksimal 3 bulan). Rekrutmen dilakukan sesuai <em>Manpower Planning</em> (MPP) dari sumber internal maupun eksternal.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 6, 7 & 8: KELUARGA KARYAWAN, PENEMPATAN & PERNIKAHAN SESAMA KARYAWAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Larangan Rekrutmen Keluarga Langsung (Pasal 6):</strong> Ayah, ibu, mertua, suami/istri, kakak, adik, anak, dan menantu dilarang direkrut. Jika melanggar, keduanya wajib mengundurkan diri sukarela.</li>
+                      <li><strong>Penempatan (Pasal 7):</strong> Anggota keluarga langsung/dekat dilarang bekerja dalam satu bagian, atasan-bawahan, satu kantor, atau unit kerja yang sama.</li>
+                      <li><strong>Pernikahan Sesama Karyawan (Pasal 8):</strong> Wajib lapor ke atasan dan HRD minimal <strong>1 bulan</strong> sebelum acara dan keduanya sudah karyawan tetap. Penyesuaian lokasi kerja maksimal <strong>2 bulan</strong> setelah menikah; jika tidak, salah satu wajib mengundurkan diri sukarela.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 9 - 13: PELATIHAN, KARIR, PENILAIAN KINERJA, MUTASI & PROMOSI/DEMOSI</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Pelatihan (Pasal 9):</strong> Perusahaan dapat menetapkan ikatan dinas; pengajuan pelatihan oleh karyawan minimal <strong>10 hari kerja</strong> sebelumnya.</li>
+                      <li><strong>Penilaian Kinerja (Pasal 11):</strong> Dilakukan objektif berdasarkan KPI minimal <strong>2 kali setahun</strong> (tengah & akhir tahun) melalui diskusi tertutup sebagai dasar kenaikan grade, gaji, dan bonus.</li>
+                      <li><strong>Mutasi & Promosi/Demosi (Pasal 12-13):</strong> Karyawan wajib menerima mutasi/rotasi. Promosi meliputi peningkatan jabatan, grade/pangkat, atau keduanya; demosi dilakukan akibat turunnya prestasi dan kondite kerja.</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-5',
+              babLabel: 'BAB V',
+              pasalRange: 'Pasal 14 - 17',
+              title: 'HAK DAN KEWAJIBAN KARYAWAN DAN PENGUSAHA',
+              summary: 'Hak karyawan (Pasal 14), 16 butir kewajiban karyawan (Pasal 15), hak pengusaha (Pasal 16), dan kewajiban pengusaha (Pasal 17).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 14 & 15: HAK DAN KEWAJIBAN KARYAWAN</h4>
+                    <p class="mb-2"><strong>Hak Karyawan (Pasal 14):</strong> Tugas & perangkat kerja layak, pengembangan karir, istirahat & cuti, gaji & tunjangan, kepesertaan BPJS Ketenagakerjaan & BPJS Kesehatan, menyampaikan saran, serta pembelaan hukum saat menjalankan tugas dinas.</p>
+                    <p><strong>Kewajiban Karyawan (Pasal 15, Butir a s/d p):</strong> Mematuhi PP & SOP, bertindak sesuai kode etik, mencegah benturan kepentingan, melaporkan penyimpangan, menjaga rahasia perusahaan, mengutamakan K3, menjaga inventaris, mencapai sasaran kerja, berpakaian sopan, dan mengembalikan seluruh inventaris/dokumen saat PHK.</p>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 16 & 17: HAK DAN KEWAJIBAN PENGUSAHA / PERUSAHAAN</h4>
+                    <p>Pengusaha berhak memberi perintah kerja, menetapkan SOP, struktur organisasi, grade, penggajian, mutasi, sanksi, promosi/demosi, dan lembur/shift; serta berkewajiban memelihara K3, memberi pelatihan, mensosialisasikan PP, melindungi hukum karyawan, tidak diskriminatif, dan mendaftarkan BPJS.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-6',
+              babLabel: 'BAB VI',
+              pasalRange: 'Pasal 18 - 26',
+              title: 'TATA TERTIB KERJA',
+              summary: 'Jam kerja Kantor Pusat (09:00–17:00 WIB) & absensi Fingerprint (Pasal 18), tata tertib, hari libur, hak cuti, tabel izin dibayar (Pasal 22), cuti melahirkan, ibadah, unpaid leave, & sakit.',
+              content: `
+                <div class="space-y-6">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 18: WAKTU DAN JAM KERJA KARYAWAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Kantor Pusat:</strong> Hari Kerja Senin s/d Jumat, Jam Kerja <strong>09:00 – 17:00 WIB</strong>.</li>
+                      <li><strong>Operasional Klinik Cabang:</strong> Sesuai perjanjian kerja antara Pengusaha dan Karyawan.</li>
+                      <li>Karyawan wajib melakukan scan kehadiran melalui <strong>mesin fingerprint</strong> atau alat pencatat kehadiran yang tersedia setiap harinya. Saat jam kerja dimulai dilarang masih mengganti seragam, berdandan, atau makan di tempat kerja.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 19, 20 & 21: TATA TERTIB, HARI LIBUR & HAK CUTI TAHUNAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Tata Tertib & Hari Libur (Pasal 19-20):</strong> Wajib memakai seragam & ID Card, menjaga kerahasiaan, dilarang bekerja di perusahaan lain. Hari libur mengikuti libur nasional kecuali pelayanan kesehatan/klinik.</li>
+                      <li><strong>Hak Cuti Tahunan (Pasal 21):</strong> <strong>12 hari kerja</strong> per tahun (Januari–Desember) setelah masa kerja 12 bulan (prorata <code>N/12 × 12</code> untuk karyawan baru). Dapat diambil setelah masa kerja <strong>3 bulan</strong> (karyawan tetap) atau <strong>1 tahun</strong> (kontrak), maksimal <strong>4 hari</strong> per pengambilan.</li>
+                    </ul>
+                  </div>
+
+                  <div class="space-y-3">
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 22: IJIN MENINGGALKAN PEKERJAAN (TETAP MENERIMA UPAH)</h4>
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-xs text-left border border-slate-200">
+                        <thead class="bg-slate-100 text-slate-800 uppercase font-semibold">
+                          <tr>
+                            <th class="p-2 border border-slate-200 w-10 text-center">No</th>
+                            <th class="p-2 border border-slate-200">Keperluan Izin Resmi</th>
+                            <th class="p-2 border border-slate-200 text-center">Dalam Kota</th>
+                            <th class="p-2 border border-slate-200 text-center">Luar Kota</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 text-slate-700">
+                          <tr><td class="p-2 border text-center">1</td><td class="p-2 border font-medium">Suami/istri, anak, bapak/ibu kandung, bapak/ibu mertua, saudara kandung meninggal dunia</td><td class="p-2 border text-center">2 hari kerja</td><td class="p-2 border text-center">3 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">2</td><td class="p-2 border">Kematian anggota keluarga lainnya dalam satu rumah</td><td class="p-2 border text-center" colspan="2">1 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">3</td><td class="p-2 border font-medium">Karyawan Menikah</td><td class="p-2 border text-center" colspan="2">3 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">4</td><td class="p-2 border">Istri Melahirkan / Keguguran</td><td class="p-2 border text-center" colspan="2">2 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">5</td><td class="p-2 border">Mengkhitankan / Membaptiskan anak</td><td class="p-2 border text-center" colspan="2">1 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">6</td><td class="p-2 border">Menikahkan anak</td><td class="p-2 border text-center" colspan="2">2 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">7</td><td class="p-2 border">Rumah terkena bencana (banjir, gempa bumi, angin topan, kebakaran, dsb)</td><td class="p-2 border text-center" colspan="2">2 hari kerja</td></tr>
+                          <tr><td class="p-2 border text-center">8</td><td class="p-2 border font-medium">Menyusui bayinya (s/d usia 9 bulan)</td><td class="p-2 border text-center" colspan="2">2 jam / hari *</td></tr>
+                          <tr><td class="p-2 border text-center">9</td><td class="p-2 border">Menjalankan ibadah haji pertama kali</td><td class="p-2 border text-center" colspan="2">Sesuai ketentuan Pemerintah</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 23 - 26: MELAHIRKAN, IBADAH, UNPAID LEAVE & ISTIRAHAT SAKIT</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Istirahat Melahirkan (Pasal 23):</strong> 1,5 bulan sebelum + 1,5 bulan setelah melahirkan; keguguran 1,5 bulan.</li>
+                      <li><strong>Ibadah Wajib (Pasal 24) & Izin Di Luar Tanggungan (Pasal 25):</strong> Masa kerja min. 5 tahun dapat mengajukan unpaid leave 3–6 bulan atas persetujuan Pimpinan Perusahaan.</li>
+                      <li><strong>Istirahat Sakit (Pasal 26):</strong> Sakit 1 hari lapor maks. 1 jam setelah jam mulai kerja; sakit ≥2 hari wajib surat dokter. Upah sakit berkepanjangan: 4 bln I (100%), 4 bln II (75%), 4 bln III (50%), selanjutnya (25%).</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-7',
+              babLabel: 'BAB VII',
+              pasalRange: 'Pasal 27 - 29',
+              title: 'IMBAL JASA, PENGELOMPOKAN LEVEL JABATAN, GRADE DAN KEPANGKATAN',
+              summary: 'Komponen imbal jasa (Gaji Pokok, tunjangan tetap/lainnya, bonus/insentif variabel, benefit non-tunai), level jabatan, dan grade.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 27 - 29: KOMPONEN IMBAL JASA, LEVEL JABATAN & GRADE</h4>
+                    <p>Imbal jasa terdiri atas Gaji Pokok, tunjangan tetap dan tunjangan lainnya, bonus dan insentif variabel sesuai prestasi dan kinerja perusahaan, serta manfaat (benefit) non-tunai. Pengelompokan level jabatan dan grade mencerminkan tingkat keterlibatan strategis, kompetensi, dan pengalaman karyawan.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-8',
+              babLabel: 'BAB VIII',
+              pasalRange: 'Pasal 30 - 31',
+              title: 'TUNJANGAN',
+              summary: 'Jenis tunjangan (Pasal 30) dan ketentuan pembayaran Tunjangan Hari Raya (THR) Keagamaan (Pasal 31).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 30 & 31: JENIS TUNJANGAN & THR KEAGAMAAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Jenis tunjangan meliputi THR Keagamaan, tunjangan jabatan, tunjangan khusus masa kerja, tunjangan transport, tunjangan kehadiran, dan tunjangan lainnya.</li>
+                      <li>THR dibayarkan maksimal <strong>14 hari sebelum Hari Raya</strong>. Masa kerja 3–11 bulan dibayar proporsional; masa kerja ≥12 bulan sebesar <strong>1 bulan Gaji Pokok + Tunjangan Tetap</strong>.</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-9',
+              babLabel: 'BAB IX',
+              pasalRange: 'Pasal 32',
+              title: 'PROGRAM BPJS',
+              summary: 'Kepesertaan program jaminan sosial BPJS Kesehatan dan BPJS Ketenagakerjaan.',
+              content: `
+                <div class="space-y-3">
+                  <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 32: PROGRAM BPJS</h4>
+                  <p>Pengusaha mengikutsertakan karyawan dalam program jaminan sosial tenaga kerja yang diselenggarakan oleh <strong>BPJS Kesehatan</strong> dan <strong>BPJS Ketenagakerjaan</strong> dengan menyesuaikan peraturan perundang-undangan yang berlaku.</p>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-10',
+              babLabel: 'BAB X',
+              pasalRange: 'Pasal 33 - 37',
+              title: 'PEMBINAAN, SANKSI DAN REHABILITASI',
+              summary: 'Pembinaan karyawan (Pasal 33), Pasal 34 Jenis Pelanggaran & Sanksi (43 Berat, 25 Sedang, 18 Ringan), penetapan sanksi, skorsing, dan rehabilitasi.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 33: PEMBINAAN KARYAWAN</h4>
+                    <p>Setiap pimpinan unit kerja wajib mengawasi dan membina bawahannya melalui <em>coaching</em> & konseling maupun pemberian sanksi.</p>
+                  </div>
+                  <div class="bg-rose-50 border border-rose-200 p-4 rounded-xl space-y-2">
+                    <h4 class="font-bold text-rose-900 text-base">Pasal 34: JENIS PELANGGARAN DAN SANKSI</h4>
+                    <p class="text-xs text-slate-700">Pelanggaran terbagi dalam 3 kategori: <strong>Pelanggaran Berat (43 poin — PHK)</strong>, <strong>Pelanggaran Sedang (25 poin — SP3 / SP2)</strong>, dan <strong>Pelanggaran Ringan (18 poin — SP1)</strong>.</p>
+                    <button @click="activeTab = 'sanksi'; selectedBab = null" class="px-3 py-1.5 bg-rose-600 text-white text-xs font-semibold rounded-lg hover:bg-rose-700 transition">Buka Tabel Rincian 86 Poin Pasal 34 →</button>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 35 - 37: PENETAPAN SANKSI, SKORSING & REHABILITASI</h4>
+                    <p>Masa berlaku SP1, SP2, dan SP3 masing-masing <strong>6 bulan</strong>. Pelaksanaan PHK dikoordinasikan dengan HRD dan disetujui Direksi/Pimpinan Perusahaan. Skorsing dapat diberikan selama proses PHK/investigasi, dan nama baik dipulihkan (rehabilitasi) jika tidak terbukti bersalah.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-11',
+              babLabel: 'BAB XI',
+              pasalRange: 'Pasal 38 - 39',
+              title: 'PERLINDUNGAN HUKUM DAN KOMITMEN',
+              summary: 'Perlindungan hukum dalam menjalankan tugas jabatan (Pasal 38) dan komitmen penyelesaian perselisihan hubungan industrial (Pasal 39).',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 38 & 39: PERLINDUNGAN HUKUM & KOMITMEN PIHAK-PIHAK</h4>
+                    <p>Perusahaan menyediakan bantuan advokat bagi karyawan yang terlibat perkara hukum saat menjalankan tugas sesuai SOP (diputuskan komite). Perselisihan hubungan industrial diselesaikan secara musyawarah/bipartit sebelum mengacu pada UU No. 2 Tahun 2004 tentang PPHI.</p>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-12',
+              babLabel: 'BAB XII',
+              pasalRange: 'Pasal 40 - 49',
+              title: 'PEMUTUSAN HUBUNGAN KERJA (PHK)',
+              summary: 'Sebab PHK, komponen upah dasar PHK (Pasal 40A), masa percobaan, resign/habis kontrak, mangkir, pensiun, meninggal dunia, sakit berkepanjangan, pelanggaran mendesak (Pasal 47), & ditahan pihak berwajib.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 40 - 43: SEBAB PHK, KOMPONEN UPAH, PERCOBAAN, RESIGN & MANGKIR</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Komponen Upah PHK (Pasal 40A):</strong> Upah Pokok + Tunjangan Tetap.</li>
+                      <li><strong>Resign & Selesai Kontrak (Pasal 42):</strong> Pengajuan resign min. <strong>30 hari sebelumnya</strong>. PKWT yang selesai kontrak mendapat uang kompensasi proporsional (<code>Masa Kerja/12 × 1 Bulan Upah</code>); PKWT yang resign tanpa memenuhi syarat dikenakan penalti gaji bersih.</li>
+                      <li><strong>Mangkir (Pasal 43):</strong> Tidak masuk kerja <strong>5 hari kerja atau lebih berturut-turut</strong> tanpa bukti sah setelah dipanggil 2 kali dikualifikasikan mengundurkan diri.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 44 - 49: PENSIUN, MENINGGAL DUNIA, SAKIT BERKEPANJANGAN, PELANGGARAN MENDESAK & DITAHAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li><strong>Pensiun (Pasal 44), Meninggal Dunia (Pasal 45) & Sakit Berkepanjangan >12 Bulan (Pasal 46):</strong> Hak pesangon, UPMK, dan UPH mengacu pada PP No. 35 Tahun 2021.</li>
+                      <li><strong>Pelanggaran Bersifat Mendesak (Pasal 47):</strong> Memuat daftar 43 pelanggaran berat; karyawan berhak atas UPH dan Uang Pisah, sedangkan PHK karena SP3 mendapat pesangon 0,5x ketentuan PP 35/2021 Pasal 52 ayat (1).</li>
+                      <li><strong>Ditahan Pihak Berwajib (Pasal 48) & Sebab Lainnya (Pasal 49):</strong> Bantuan keluarga tanggungan hingga 6 bulan (25%–50% upah) sesuai PP 35/2021 Pasal 53.</li>
+                    </ul>
+                  </div>
+                </div>
+              `
+            },
+            {
+              id: 'mgm-bab-13',
+              babLabel: 'BAB XIII',
+              pasalRange: 'Pasal 50 - 53',
+              title: 'KETENTUAN PENUTUP',
+              summary: 'Sosialisasi softcopy PP, kewajiban tanda tangan pernyataan kepatuhan, perubahan peraturan, dan pengesahan di Jakarta tanggal 8 Juni 2026.',
+              content: `
+                <div class="space-y-4">
+                  <div>
+                    <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 50 - 53: KETENTUAN PENUTUP & PERUBAHAN</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Peraturan Perusahaan dibagikan dalam bentuk <em>softcopy</em> dan wajib ditandatangani Surat Pernyataan Kepatuhannya oleh setiap karyawan.</li>
+                      <li>Ketentuan teknis ditetapkan melalui SK, Surat Edaran, atau Memorandum Pimpinan Perusahaan.</li>
+                    </ul>
+                  </div>
+                  <div class="bg-slate-100 p-4 rounded-xl text-xs text-slate-700">
+                    <p><strong>Ditetapkan di:</strong> Jakarta, 8 Juni 2026</p>
+                    <p><strong>CV. Medika Group Mandiri</strong> — Dr. Said Rizal (Pimpinan Perusahaan)</p>
+                  </div>
+                </div>
+              `
+            }
+          ]
+        },
+
+        // DAFTAR LENGKAP 43 PELANGGARAN BERAT
+        pelanggaranBeratList: [
+          { no: 1, desc: 'Melakukan tindakan penyimpangan seperti pencucian uang (money laundering), memanipulasi, memalsukan, menipu, mencuri, menggelapkan uang/aset perusahaan atau pihak-pihak lainnya.', sanksi: 'PHK' },
+          { no: 2, desc: 'Membuat atau menyebabkan adanya pencatatan palsu dalam pembukuan, laporan, maupun dokumen dan laporan transaksi.', sanksi: 'PHK' },
+          { no: 3, desc: 'Menghilangkan atau tidak memasukkan atau menyebabkan tidak dilakukannya pencatatan dalam pembukuan, laporan kegiatan usaha dan laporan transaksi.', sanksi: 'PHK' },
+          { no: 4, desc: 'Dengan sengaja mengubah, mengaburkan, menyembunyikan, menghapus, merusak atau menghilangkan pencatatan laporan kegiatan usaha dan transaksi.', sanksi: 'PHK' },
+          { no: 5, desc: 'Meminta, menerima, mengizinkan atau menyetujui menerima imbalan, komisi, uang tambahan, pelayanan, atau barang berharga untuk keuntungan pribadi/kelompok.', sanksi: 'PHK' },
+          { no: 6, desc: 'Melakukan tindakan pembiaran atas pelanggaran yang terjadi di lingkungan kerja/perusahaan yang mengakibatkan perusahaan atau pihak lain menderita kerugian.', sanksi: 'PHK' },
+          { no: 7, desc: 'Menggunakan dana perusahaan di luar kegiatan dan kepentingan perusahaan untuk pribadi.', sanksi: 'PHK' },
+          { no: 8, desc: 'Menjual atau memberikan desain konsep produk/kebijakan bisnis perusahaan kepada pihak luar untuk kepentingan pribadi, kelompok, atau pihak lain.', sanksi: 'PHK' },
+          { no: 9, desc: 'Menaikkan harga (mark-up) atau mengambil diskon dari pembelian barang dan jasa untuk kepentingan pribadi atau kelompok.', sanksi: 'PHK' },
+          { no: 10, desc: 'Memanipulasi dan mengajukan pembayaran atas pengeluaran biaya pembelian barang/jasa yang tidak pernah terjadi atau fiktif.', sanksi: 'PHK' },
+          { no: 11, desc: 'Meminta atau menerima sesuatu (uang, barang, peluang bisnis) sebagai komisi/imbalan dari klien atau penyedia jasa dalam proses transaksi.', sanksi: 'PHK' },
+          { no: 12, desc: 'Memanfaatkan jabatan untuk menekan bawahan agar tidak melaporkan perbuatan kecurangan/tindak pidana yang telah dilakukannya kepada pejabat berwenang.', sanksi: 'PHK' },
+          { no: 13, desc: 'Menjual aset milik perusahaan untuk kepentingan pribadi.', sanksi: 'PHK' },
+          { no: 14, desc: 'Menawarkan atau meminta imbalan dalam bentuk apapun sebagai balas jasa kepada calon karyawan baru pada saat rekrutmen.', sanksi: 'PHK' },
+          { no: 15, desc: 'Menerima segala bentuk bingkisan/hiburan/perjamuan (entertainment) di luar batas kewajaran dari pihak lain tanpa pemberitahuan pejabat berwenang.', sanksi: 'PHK' },
+          { no: 16, desc: 'Tanpa izin mengakses data milik perusahaan yang bukan kewenangannya guna mendapatkan data dan informasi untuk keuntungan pribadi atau pihak lain.', sanksi: 'PHK' },
+          { no: 17, desc: 'Memberikan data klien kepada pihak ketiga/pesaing sehingga menimbulkan kerugian bagi klien dan/atau kerugian bagi perusahaan.', sanksi: 'PHK' },
+          { no: 18, desc: 'Menggunakan aset atau fasilitas perusahaan di luar wewenangnya untuk kepentingan pribadi atau kelompok.', sanksi: 'PHK' },
+          { no: 19, desc: 'Menggunakan, menyebarkan, atau memusnahkan catatan, dokumen, dan informasi perusahaan tanpa persetujuan pejabat berwenang.', sanksi: 'PHK' },
+          { no: 20, desc: 'Melakukan ikatan bisnis secara pribadi maupun kelompok atau melibatkan keluarga dengan pihak lain yang menimbulkan benturan kepentingan.', sanksi: 'PHK' },
+          { no: 21, desc: 'Mengajukan klaim pengeluaran biaya perusahaan dengan jumlah tidak wajar atau bukti palsu untuk kepentingan pribadi maupun pihak lain.', sanksi: 'PHK' },
+          { no: 22, desc: 'Melakukan dan menandatangani perjanjian kerjasama dan/atau dokumen mengatasnamakan perusahaan di luar kewenangan tanpa persetujuan pejabat berwenang.', sanksi: 'PHK' },
+          { no: 23, desc: 'Meminta atau menerima komisi dari penjualan aset perusahaan/barang jaminan/agunan untuk kepentingan pribadi tanpa persetujuan pejabat berwenang.', sanksi: 'PHK' },
+          { no: 24, desc: 'Mengajukan pembayaran untuk transaksi pembelian barang dan jasa yang tidak pernah terjadi atau fiktif.', sanksi: 'PHK' },
+          { no: 25, desc: 'Melakukan tindakan asusila, pelecehan seksual (tindakan fisik dan/atau kata-kata tidak sepantasnya seperti siul dan menyentuh bagian tubuh).', sanksi: 'PHK' },
+          { no: 26, desc: 'Perjudian di lingkungan perusahaan.', sanksi: 'PHK' },
+          { no: 27, desc: 'Mencemarkan nama baik perusahaan melalui media sosial (Facebook, Twitter, WhatsApp, Instagram, YouTube, SMS, dan lain-lain).', sanksi: 'PHK' },
+          { no: 28, desc: 'Mabuk, menggunakan, menyimpan, dan mengedarkan minuman keras, narkotika, psikotropika, dan zat adiktif lainnya di lingkungan kerja.', sanksi: 'PHK' },
+          { no: 29, desc: 'Menyerang, menganiaya, mengancam, mengintimidasi, menghina rekan kerja, membully, pengusaha atau pihak lain termasuk di media sosial.', sanksi: 'PHK' },
+          { no: 30, desc: 'Melakukan tindakan yang membahayakan keselamatan dan kesehatan kerja (K3) dan/atau keamanan di lingkungan kerja.', sanksi: 'PHK' },
+          { no: 31, desc: 'Membujuk dan/atau bersekongkol dengan karyawan lain untuk melakukan tindakan yang bertentangan dengan hukum dan peraturan perundang-undangan.', sanksi: 'PHK' },
+          { no: 32, desc: 'Menyalahgunakan wewenang dan jabatannya untuk kepentingan pribadi sehingga merugikan perusahaan.', sanksi: 'PHK' },
+          { no: 33, desc: 'Tidak menjaga rahasia-rahasia perusahaan atau membocorkan data dan informasi rahasia perusahaan kepada pihak lain.', sanksi: 'PHK' },
+          { no: 34, desc: 'Meminjamkan atau menggadaikan aset perusahaan untuk kepentingan dan keuntungan pribadi.', sanksi: 'PHK' },
+          { no: 35, desc: 'Mangkir selama 5 (lima) hari kerja atau lebih berturut-turut tanpa keterangan tertulis dengan bukti sah dan telah dipanggil patut 2 kali.', sanksi: 'PHK' },
+          { no: 36, desc: 'Melakukan kesalahan kembali saat berlakunya Surat Peringatan (SP3) dan melakukan pelanggaran kembali dengan bobot setara SP2 atau lebih berat.', sanksi: 'PHK' },
+          { no: 37, desc: 'Dengan sengaja atau ceroboh merusak aset perusahaan yang mengakibatkan kerugian bagi perusahaan.', sanksi: 'PHK' },
+          { no: 38, desc: 'Menolak perintah kerja/tidak menjalankan pekerjaan walaupun sudah diberikan pembinaan dan sanksi Surat Peringatan (SP3).', sanksi: 'PHK' },
+          { no: 39, desc: 'Mencemarkan nama baik perusahaan yang dapat menjatuhkan reputasi dan merugikan perusahaan.', sanksi: 'PHK' },
+          { no: 40, desc: 'Bekerja/mengikatkan diri dalam hubungan kerja dengan perusahaan lain.', sanksi: 'PHK' },
+          { no: 41, desc: 'Tidak dapat mencapai sasaran kerja sesuai target yang ditetapkan dan tidak ada itikad baik walau sudah diberikan pembinaan dan SP3.', sanksi: 'PHK' },
+          { no: 42, desc: 'Mengingkari kesepakatan dan komitmen tertulis/lisan walaupun telah diberikan pembinaan (coaching) dan sanksi SP3.', sanksi: 'PHK' },
+          { no: 43, desc: 'Membocorkan, menyebarkan, atau menyalahgunakan data rekam medis pasien (fisik maupun Rekam Medis Elektronik/RME) tanpa izin tertulis Manajemen (diproses pidana UU PDP).', sanksi: 'PHK & Pidana' }
+        ],
+
+        // DAFTAR LENGKAP 25 PELANGGARAN SEDANG
+        pelanggaranSedangList: [
+          { no: 1, desc: 'Tidak melaporkan kepada atasan/pejabat berwenang ketika mengetahui rekan kerja mendapat tekanan untuk melakukan penyimpangan/pelanggaran.', sanksi: 'SP3' },
+          { no: 2, desc: 'Menimbulkan/membuat keonaran di lingkungan perusahaan yang mengakibatkan suasana kerja tidak kondusif sehingga merugikan perusahaan.', sanksi: 'SP3' },
+          { no: 3, desc: 'PUK/atasan tidak melakukan pembinaan dan/atau upaya penyelesaian permasalahan terhadap karyawan di bawah koordinasinya yang melanggar.', sanksi: 'SP3' },
+          { no: 4, desc: 'Tanpa persetujuan pejabat berwenang menggunakan dana perusahaan yang tidak sesuai dengan peruntukan semula.', sanksi: 'SP3' },
+          { no: 5, desc: 'Tidak melaporkan pemberian hadiah atau sejenisnya dari klien, vendor, atau mitra kerja kepada atasan yang dapat menimbulkan benturan kepentingan.', sanksi: 'SP3' },
+          { no: 6, desc: 'Tidak menyimpan dengan benar data/dokumen perusahaan yang menjadi tanggung jawabnya sehingga hilang atau dimanfaatkan pihak tak berwenang.', sanksi: 'SP3' },
+          { no: 7, desc: 'Kelalaian dalam penggunaan sarana/fasilitas perusahaan tidak sesuai prosedur sehingga mengakibatkan kerugian perusahaan.', sanksi: 'SP3' },
+          { no: 8, desc: 'Kelalaian dalam menyampaikan laporan kewajiban perusahaan sehingga terjadi keterlambatan yang menimbulkan kesulitan/denda.', sanksi: 'SP3' },
+          { no: 9, desc: 'Memasukkan/mencatat data keuangan perusahaan secara tidak benar sehingga menimbulkan kerugian bagi perusahaan atau pihak lain.', sanksi: 'SP3' },
+          { no: 10, desc: 'Melakukan perbuatan yang menyebabkan kesalahan data dan keterlambatan penyampaian laporan ke klien/instansi sehingga terkena sanksi/denda.', sanksi: 'SP3' },
+          { no: 11, desc: 'Tidak melaporkan kerusakan atau kehilangan aset/inventaris perusahaan yang menjadi tanggung jawabnya ke atasan/pejabat berwenang.', sanksi: 'SP3' },
+          { no: 12, desc: 'Tidak melakukan pengawasan, pembinaan, dan petunjuk dengan baik terhadap bawahan sehingga terjadi kesalahan dan pelanggaran.', sanksi: 'SP3' },
+          { no: 13, desc: 'Berkelahi dengan rekan kerja, atasan, atau pihak lain di lingkungan perusahaan sehingga mempengaruhi reputasi perusahaan.', sanksi: 'SP3' },
+          { no: 14, desc: 'Melalaikan tugas dalam pengamanan aset perusahaan sehingga menimbulkan kerugian perusahaan.', sanksi: 'SP3' },
+          { no: 15, desc: 'Melanggar tata tertib perusahaan atau tidak patuh terhadap tata kelola, sistem, dan prosedur serta kebijakan yang melandasi tugasnya.', sanksi: 'SP3' },
+          { no: 16, desc: 'Diketahui memiliki ikatan hubungan keluarga dengan karyawan lain di perusahaan tetapi tidak melaporkan ke perusahaan.', sanksi: 'SP3' },
+          { no: 17, desc: 'Terlambat menyetor pembayaran biaya-biaya kewajiban perusahaan sehingga perusahaan mendapat sanksi hukum atau wajib membayar denda.', sanksi: 'SP3' },
+          { no: 18, desc: 'Melakukan salah posting (entry journal) dalam proses transaksi/penempatan pos biaya sehingga merugikan pembukuan perusahaan.', sanksi: 'SP3' },
+          { no: 19, desc: 'Mengajukan pembayaran upah lembur yang tidak sesuai dengan waktu kerja lembur yang diperintahkan dan disetujui atasan.', sanksi: 'SP3' },
+          { no: 20, desc: 'Tidak masuk kerja selama 4 (empat) hari dalam sebulan secara berturut-turut atau tidak, tanpa keterangan.', sanksi: 'SP3' },
+          { no: 21, desc: 'Mengolok-olok atau menghina perusahaan di media sosial (Facebook, Twitter, WhatsApp, Instagram, YouTube, dan lain-lain).', sanksi: 'SP3' },
+          { no: 22, desc: 'Tidak masuk kerja selama 3 (tiga) hari dalam sebulan secara berturut-turut atau tidak, tanpa keterangan.', sanksi: 'SP2' },
+          { no: 23, desc: 'Mendapat paksaan dari atasan atau pihak lain untuk bekerjasama melakukan pelanggaran/penyimpangan tetapi tidak melapor ke pejabat berwenang.', sanksi: 'SP2' },
+          { no: 24, desc: 'Tidak melaporkan/terlambat melaporkan bawahan yang mengalami sakit berkepanjangan ke pejabat berwenang.', sanksi: 'SP2' },
+          { no: 25, desc: 'Tidak menyampaikan laporan pertanggungjawaban uang muka sesuai batas waktu yang ditetapkan tanpa alasan yang dapat dipertanggungjawabkan.', sanksi: 'SP2' }
+        ],
+
+        // DAFTAR LENGKAP 18 PELANGGARAN RINGAN (TERMASUK NO. 9)
+        pelanggaranRinganList: [
+          { no: 1, desc: 'Tidak mampu menunjukkan kompetensi dan kemampuannya, tidak dapat mencapai sasaran kerja sesuai target walaupun telah dibina/dilatih.', sanksi: 'SP1' },
+          { no: 2, desc: 'Dalam menjalankan pekerjaan tidak sesuai standar operasional prosedur (SOP) yang ditetapkan sehingga terjadi kesalahan merugikan.', sanksi: 'SP1' },
+          { no: 3, desc: 'Meninggalkan jam kerja untuk kepentingan pribadi atau pihak lain tanpa izin dari atasan.', sanksi: 'SP1' },
+          { no: 4, desc: 'Di luar wewenang dan tanggung jawabnya memberikan surat tugas atau perintah kepada karyawan.', sanksi: 'SP1' },
+          { no: 5, desc: 'Kurang teliti dalam memberikan persetujuan penggunaan dan pengeluaran biaya perusahaan sehingga klaim menyimpang tetap diproses.', sanksi: 'SP1' },
+          { no: 6, desc: 'Tidak menjaga dengan baik segala perlengkapan kerja yang diberikan kepadanya.', sanksi: 'SP1' },
+          { no: 7, desc: 'Tidak menindaklanjuti keluhan dari klien/pasien.', sanksi: 'SP1' },
+          { no: 8, desc: 'Tidak masuk kerja selama 2 (dua) hari kerja dalam satu bulan tanpa keterangan.', sanksi: 'SP1' },
+          { no: 9, desc: '3 kali berturut-turut dalam satu bulan terlambat datang ke tempat kerja lebih dari 30 menit tanpa alasan yang dapat diterima.', sanksi: 'SP1' },
+          { no: 10, desc: 'Menolak perintah mutasi, rotasi, atau penempatan/penugasan ke luar home base.', sanksi: 'SP1' },
+          { no: 11, desc: 'Memiliki permasalahan pribadi di luar urusan pekerjaan/perusahaan yang mengakibatkan kerugian nama baik bagi perusahaan.', sanksi: 'SP1' },
+          { no: 12, desc: 'Menggunakan/membawa pulang kendaraan operasional untuk kepentingan pribadi tanpa izin dari pejabat berwenang.', sanksi: 'SP1' },
+          { no: 13, desc: 'Sering datang terlambat atau pulang kerja lebih awal tanpa alasan yang wajar walaupun sudah diperingatkan oleh atasan.', sanksi: 'SP1' },
+          { no: 14, desc: 'Menggunakan logo dan identitas perusahaan untuk kepentingan pribadi.', sanksi: 'SP1' },
+          { no: 15, desc: 'Tidak bersedia masuk kerja/bekerja lembur sesuai kebutuhan perusahaan tanpa alasan yang dapat diterima.', sanksi: 'SP1' },
+          { no: 16, desc: 'Tidak menggunakan pakaian kerja sesuai standar dan tata tertib yang telah ditetapkan.', sanksi: 'SP1' },
+          { no: 17, desc: 'Tidak mengenakan ID Card selama di lingkungan perusahaan.', sanksi: 'SP1' },
+          { no: 18, desc: 'Tidak menjaga kebersihan dan ketertiban di tempat kerjanya.', sanksi: 'SP1' }
+        ],
+
+        // COMPUTED PROPERTIES
+        get activeBranchRules() {
+          if (!this.currentUser || this.currentUser.role === 'admin') return this.rulesByBranch.PT_MKK;
+          return this.rulesByBranch[this.currentUser.branch] || [];
+        },
+        get filteredRules() {
+          const list = this.activeBranchRules;
+          if (!this.searchQuery) return list;
+          const q = this.searchQuery.toLowerCase();
+          return list.filter(r =>
+            r.babLabel.toLowerCase().includes(q) ||
+            r.pasalRange.toLowerCase().includes(q) ||
+            r.title.toLowerCase().includes(q) ||
+            r.summary.toLowerCase().includes(q) ||
+            r.content.toLowerCase().includes(q)
+          );
+        },
+        get branchNotifications() {
+          if (!this.currentUser || this.currentUser.role === 'admin') return this.notifications;
+          return this.notifications.filter(n => n.targetBranch === 'ALL' || n.targetBranch === this.currentUser.branch);
+        },
+        get unreadNotificationsCount() {
+          if (!this.currentUser) return 0;
+          const readIds = JSON.parse(localStorage.getItem('pp_read_notifs_' + this.currentUser.nik) || '[]');
+          return this.branchNotifications.filter(n => !readIds.includes(n.id)).length;
+        },
+        get latestNotification() {
+          if (this.bannerDismissed || this.branchNotifications.length === 0) return null;
+          return this.branchNotifications[0];
+        },
+
+        // METHODS
+        initApp() {
+          const savedNotifs = localStorage.getItem('pp_notifications');
+          if (savedNotifs) this.notifications = JSON.parse(savedNotifs);
+
+          const savedEmps = localStorage.getItem('pp_employees');
+          if (savedEmps) this.employeesList = JSON.parse(savedEmps);
+
+          const savedLoginLogo = localStorage.getItem('pp_login_logo');
+          if (savedLoginLogo) this.loginLogo = savedLoginLogo;
+
+          const savedMkkLogo = localStorage.getItem('pp_logo_PT_MKK');
+          if (savedMkkLogo) this.branches.PT_MKK.logo = savedMkkLogo;
+
+          const savedMgmLogo = localStorage.getItem('pp_logo_CV_MGM');
+          if (savedMgmLogo) this.branches.CV_MGM.logo = savedMgmLogo;
+
+          this.$nextTick(() => lucide.createIcons());
+        },
+        handleLogin() {
+          this.currentUser = {
+            role: 'employee',
+            branch: this.loginForm.branch,
+            name: this.loginForm.name.trim(),
+            nik: this.loginForm.nik.trim().toUpperCase(),
+            position: this.loginForm.position.trim()
+          };
+          this.activeBranchData = this.branches[this.currentUser.branch];
+          this.isLoggedIn = true;
+          this.activeTab = 'bacapp';
+          this.selectedBab = null;
+          this.bannerDismissed = false;
+
+          const hour = new Date().getHours();
+          if (hour < 11) this.greetingText = 'Selamat Pagi';
+          else if (hour < 15) this.greetingText = 'Selamat Siang';
+          else if (hour < 18) this.greetingText = 'Selamat Sore';
+          else this.greetingText = 'Selamat Malam';
+
+          if (!this.employeesList.some(e => e.nik === this.currentUser.nik)) {
+            this.employeesList.push({ ...this.currentUser, signed: false, signedAt: '-' });
+            localStorage.setItem('pp_employees', JSON.stringify(this.employeesList));
+          }
+          this.$nextTick(() => { lucide.createIcons(); this.initCanvas(); });
+        },
+        promptAdminLogin() {
+          const pin = prompt("Masukkan Kode PIN / Password Administrator:");
+          if (pin === "admin123") {
+            this.currentUser = { role: 'admin', name: 'HR Administrator', nik: 'ADM-01', position: 'HR Manager' };
+            this.isLoggedIn = true;
+            this.activeTab = 'admin_dashboard';
+            this.$nextTick(() => { lucide.createIcons(); });
+          } else if (pin !== null) {
+            alert("PIN Admin Salah!");
+          }
+        },
+        publishNotification() {
+          const today = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+          this.notifications.unshift({
+            id: Date.now(),
+            targetBranch: this.notifForm.targetBranch,
+            title: this.notifForm.title,
+            message: this.notifForm.message,
+            date: today
+          });
+          localStorage.setItem('pp_notifications', JSON.stringify(this.notifications));
+          this.notifForm.title = '';
+          this.notifForm.message = '';
+          alert('Notifikasi pembaruan peraturan berhasil dipublikasikan ke karyawan!');
+        },
+        deleteNotification(id) {
+          this.notifications = this.notifications.filter(n => n.id !== id);
+          localStorage.setItem('pp_notifications', JSON.stringify(this.notifications));
+        },
+        markNotificationsRead() {
+          if (!this.currentUser) return;
+          const allIds = this.branchNotifications.map(n => n.id);
+          localStorage.setItem('pp_read_notifs_' + this.currentUser.nik, JSON.stringify(allIds));
+        },
+        dismissBanner() {
+          this.bannerDismissed = true;
+          this.markNotificationsRead();
+        },
+        uploadLoginLogo(event) {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.loginLogo = e.target.result;
+              localStorage.setItem('pp_login_logo', e.target.result);
+              alert("Logo Login diperbarui!");
+            };
+            reader.readAsDataURL(file);
+          }
+        },
+        uploadLogo(event, branchKey) {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.branches[branchKey].logo = e.target.result;
+              localStorage.setItem('pp_logo_' + branchKey, e.target.result);
+              alert("Logo unit diperbarui!");
+            };
+            reader.readAsDataURL(file);
+          }
+        },
+        logout() {
+          this.isLoggedIn = false;
+          this.currentUser = null;
+          this.selectedBab = null;
+          this.searchQuery = '';
+          this.submitted = false;
+        },
+        initCanvas() {
+          const canvas = document.getElementById('signature-canvas');
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          let writing = false;
+          const getPos = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+          };
+
+          const startDraw = (e) => { e.preventDefault(); writing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+          const draw = (e) => { if (!writing) return; e.preventDefault(); const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+          const stopDraw = (e) => { if (!writing) return; writing = false; ctx.closePath(); };
+
+          canvas.onmousedown = startDraw;
+          canvas.onmousemove = draw;
+          canvas.onmouseup = stopDraw;
+          canvas.onmouseleave = stopDraw;
+          canvas.ontouchstart = startDraw;
+          canvas.ontouchmove = draw;
+          canvas.ontouchend = stopDraw;
+        },
+        clearSignature() {
+          const canvas = document.getElementById('signature-canvas');
+          if (canvas) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); }
+        },
+        submitSignature() {
+          this.submitted = true;
+          const now = new Date().toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          const emp = this.employeesList.find(e => e.nik === this.currentUser.nik);
+          if (emp) {
+            emp.signed = true;
+            emp.signedAt = now;
+            localStorage.setItem('pp_employees', JSON.stringify(this.employeesList));
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>
