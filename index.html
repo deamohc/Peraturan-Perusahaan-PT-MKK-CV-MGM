@@ -32,6 +32,12 @@
   <div class="absolute top-10 left-10 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl animate-float-slow pointer-events-none"></div>
   <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-float-fast pointer-events-none"></div>
 
+  <!-- INDIKATOR SINKRONISASI CLOUD -->
+  <div x-show="isSyncing" class="fixed bottom-4 right-4 z-50 bg-slate-900/90 text-white text-xs px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 border border-slate-700">
+    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span>
+    <span>Menyinkronkan data dengan Google Sheets...</span>
+  </div>
+
   <!-- 1. HALAMAN LOGIN -->
   <template x-if="!isLoggedIn">
     <div class="flex-grow flex items-center justify-center px-4 py-12 relative z-10">
@@ -112,6 +118,14 @@
             </div>
 
             <div class="flex items-center space-x-3">
+              <!-- TOMBOL REFRESH DATA CLOUD UNTUK ADMIN -->
+              <template x-if="currentUser.role === 'admin'">
+                <button @click="fetchFromGoogleSheets()" class="flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold px-3 py-2 rounded-lg transition border border-emerald-200">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5" :class="isSyncing ? 'animate-spin' : ''"></i>
+                  <span class="hidden sm:inline">Refresh Data</span>
+                </button>
+              </template>
+
               <!-- TOMBOL NOTIFIKASI KARYAWAN -->
               <template x-if="currentUser.role !== 'admin'">
                 <div class="relative">
@@ -222,7 +236,7 @@
           <!-- CONTENT AREA -->
           <section class="lg:col-span-3 space-y-6">
 
-            <!-- BANNER NOTIFIKASI UPDATE TERBARU (OTOMATIS MUNCUL JIKA ADA UPDATE) -->
+            <!-- BANNER NOTIFIKASI UPDATE TERBARU -->
             <template x-if="currentUser.role !== 'admin' && latestNotification">
               <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm flex items-start justify-between gap-4 animate-fade-in">
                 <div class="flex items-start gap-3">
@@ -511,7 +525,7 @@
                 <button type="submit" class="w-full py-3 text-white font-semibold rounded-lg shadow-sm transition" :class="currentUser.branch === 'PT_MKK' ? 'bg-blue-800 hover:bg-blue-900' : 'bg-rose-600 hover:bg-rose-700'">Simpan Pernyataan Kepatuhan</button>
               </form>
               <div x-show="submitted" class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-center text-xs font-semibold text-emerald-800">
-                Pernyataan kepatuhan berhasil disimpan dan tercatat di log HRD!
+                Pernyataan kepatuhan berhasil disimpan dan tersinkronisasi ke Google Sheets HRD!
               </div>
             </div>
 
@@ -592,7 +606,7 @@
             <div x-show="currentUser.role === 'admin' && activeTab === 'admin_notif'" class="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
               <div>
                 <h2 class="text-xl font-bold text-slate-900">Kirim Notifikasi & Pengumuman Revisi Peraturan</h2>
-                <p class="text-xs text-slate-500">Notifikasi akan otomatis muncul di beranda dan lonceng notifikasi karyawan sesuai unit yang dipilih.</p>
+                <p class="text-xs text-slate-500">Notifikasi akan otomatis tersimpan di Google Sheets dan muncul di beranda karyawan sesuai unit yang dipilih.</p>
               </div>
 
               <form @submit.prevent="publishNotification()" class="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
@@ -680,7 +694,13 @@
   <script>
     function appData() {
       return {
+        // =========================================================================
+        // GANTI TEKS DI BAWAH INI DENGAN URL WEB APP GOOGLE APPS SCRIPT KAMU
+        // =========================================================================
+        GOOGLE_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxwn1tN1QKpZ7h8N7T8qZXsKWEzZN87Ad8luGj6AHdpM1VFTMuIXSrwssMWFekahN51/exec',
+
         isLoggedIn: false,
+        isSyncing: false,
         activeTab: 'bacapp',
         adminFilterBranch: 'ALL',
         selectedBab: null,
@@ -703,10 +723,7 @@
             date: '08 Jun 2026'
           }
         ],
-        employeesList: [
-          { name: 'Dr. Budi Santoso', nik: 'MKK-001', position: 'Dokter Umum', branch: 'PT_MKK', signed: true, signedAt: '09 Jun 2026 09:15' },
-          { name: 'Siti Rahma, Amd.Kep', nik: 'MGM-001', position: 'Perawat Klinik', branch: 'CV_MGM', signed: false, signedAt: '-' }
-        ],
+        employeesList: [],
         branches: {
           PT_MKK: {
             name: 'PT. Medika Kesehatan Kerja (Medika OHC)',
@@ -731,9 +748,6 @@
 
         // DATA PERATURAN LENGKAP PER UNIT PERUSAHAAN
         rulesByBranch: {
-          // =========================================================================
-          // 1. PT MEDIKA KESEHATAN KERJA (BAB I - XIV, PASAL 1 - 61)
-          // =========================================================================
           PT_MKK: [
             {
               id: 'mkk-bab-1',
@@ -831,12 +845,10 @@
                     <p class="mb-1"><strong>1. Persyaratan Penerimaan:</strong> WNI, usia minimal 18 tahun, sehat jasmani & rohani, berkelakuan baik, memenuhi kualifikasi jabatan, lulus seleksi, bersedia ditempatkan di seluruh wilayah RI, serta menandatangani surat perjanjian kerja dan mematuhi kode etik.</p>
                     <p class="mb-1"><strong>2-4. Jenis Perjanjian Kerja:</strong> Dibuat tertulis sesuai UU, meliputi <strong>PKWT</strong> (Kontrak) dan <strong>PKWTT</strong> (Tetap, dapat melalui masa percobaan maksimal 3 bulan).</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 5: PENERIMAAN KARYAWAN</h4>
                     <p>Penerimaan didasarkan pada <em>Manpower Planning</em> (MPP) melalui sumber <strong>Internal</strong> (mutasi, promosi, <em>Internal Job Posting</em>) dan <strong>Eksternal</strong> (Campus Hiring, jasa rekrutmen, iklan media, website, referensi karyawan, dan <em>Walk-In Applicant</em>). Kandidat lulus seleksi diberikan <em>Offering Letter</em>.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 6: KARYAWAN DALAM MASA PERCOBAAN</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -845,17 +857,14 @@
                       <li>Usulan pengangkatan tetap disampaikan pimpinan unit ke SDM maksimal <strong>14 hari kerja</strong> sebelum masa percobaan berakhir (dihitung sebagai masa kerja). Pemberitahuan tidak lulus maksimal <strong>7 hari kerja</strong> sebelum berakhir.</li>
                     </ul>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 7: REKRUTMEN TERHADAP KELUARGA KARYAWAN</h4>
                     <p>Perusahaan melarang merekrut calon karyawan dengan ikatan keluarga langsung (ayah, ibu, mertua, suami/istri, kakak, adik, anak, menantu). Jika terbukti mengajak keluarga langsung masuk bekerja, keduanya wajib mengundurkan diri secara sukarela. Keluarga dekat di luar keluarga langsung diperbolehkan selama tidak ada benturan kepentingan dan dideklarasikan saat melamar.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 8: PENEMPATAN DAN PENUGASAN KARYAWAN</h4>
                     <p>Penempatan sesuai kualifikasi jabatan. Penugasan sementara (Pjs) dapat ditunjuk untuk mengisi kekosongan. Penugasan ke luar <em>homebase</em> mendapat fasilitas luar homebase (kecuali sudah ditanggung klien). Anggota keluarga langsung/dekat dilarang bekerja dalam satu bagian, hubungan atasan-bawahan, satu kantor, atau unit kerja yang sama.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 9: PERNIKAHAN SESAMA KARYAWAN</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -863,17 +872,14 @@
                       <li>Setelah menikah dilarang berada dalam satu unit/bagian atau atasan-bawahan. Penyesuaian lokasi kerja maksimal <strong>2 (dua) bulan</strong> setelah menikah; jika tidak dilakukan penyesuaian, salah satu wajib mengundurkan diri secara sukarela.</li>
                     </ul>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 10 & 11: PENDIDIKAN, PELATIHAN & PENGEMBANGAN KARIR</h4>
                     <p>Perusahaan menyelenggarakan program pelatihan internal/eksternal dan berhak menetapkan kewajiban <strong>ikatan dinas</strong> beserta sanksi pengembalian biaya pelatihan. Pengajuan pelatihan oleh karyawan wajib disampaikan minimal <strong>10 hari kerja</strong> sebelum pelatihan dimulai.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 12: PENILAIAN KINERJA KARYAWAN</h4>
                     <p>Penilaian kinerja mengacu pada sasaran kerja dan <strong>Key Performance Indicator (KPI)</strong> secara objektif dan transparan minimal <strong>2 (dua) kali setahun</strong> (tengah tahun dan akhir tahun) melalui diskusi tatap muka tertutup. Hasilnya menjadi dasar kenaikan grade/pangkat, gaji, dan bonus. Karyawan yang tidak mencapai target wajib diberi bimbingan; jika tetap tidak tercapai dapat diberikan SP hingga PHK.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 13 & 14: MUTASI, ROTASI, PROMOSI & DEMOSI</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -882,7 +888,6 @@
                       <li><strong>Demosi:</strong> Penurunan jabatan/grade/pangkat akibat turunnya prestasi dan kondite kerja.</li>
                     </ul>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 15: USIA PENSIUN</h4>
                     <p>Usia pensiun normal ditetapkan pada usia <strong>56 (lima puluh enam) tahun</strong>. Enam bulan sebelum pensiun, perusahaan dapat memberikan masa persiapan pensiun (MPP) dengan upah penuh. Pensiunan yang masih mampu dan dibutuhkan dapat dipekerjakan kembali melalui skema PKWT atau pekerja lepas.</p>
@@ -910,7 +915,6 @@
                       <li>Memperoleh pembelaan hukum atau biaya penyelesaian dari perusahaan apabila terkena tindakan hukum saat menjalankan tugas perusahaan (kecuali akibat kelalaian karyawan).</li>
                     </ol>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 17: KEWAJIBAN KARYAWAN (Butir a s/d p)</h4>
                     <ol class="list-[lower-alpha] pl-5 space-y-1">
@@ -933,7 +937,6 @@
                     </ol>
                     <p class="mt-2 text-xs text-rose-700 font-medium">*Pelanggaran atas butir a s/d p dapat dikenakan sanksi SP1, SP2, SP3, hingga PHK.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 18 & 19: HAK DAN KEWAJIBAN PENGUSAHA / PERUSAHAAN</h4>
                     <p class="mb-1"><strong>Hak Pengusaha (Pasal 18):</strong> Memberi perintah kerja, menetapkan kebijakan/SOP, struktur organisasi, grade/kepangkatan, sistem penggajian, mutasi/penempatan, pembinaan & sanksi, promosi/demosi, dan penugasan lembur/shift.</p>
@@ -964,18 +967,15 @@
                       <li>Karyawan wajib melakukan scan kehadiran melalui <strong>sistem HRIS</strong> setiap hari. Saat jam kerja dimulai dilarang masih berganti seragam, berdandan, atau makan di tempat kerja.</li>
                     </ul>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 21: WAKTU KERJA LEMBUR</h4>
                     <p>Lembur dilakukan atas perintah tertulis atasan. Upah lembur berlaku bagi karyawan <strong>Grade Staf atau lebih rendah</strong> (tidak berlaku bagi karyawan yang sudah menerima insentif seperti bagian marketing). Kegiatan training, sosialisasi, rapat dinas, perjalanan dinas, dan undangan instansi tidak termasuk kerja lembur.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 22 & 23: TATA TERTIB KERJA & HARI LIBUR</h4>
                     <p class="mb-1"><strong>Tata Tertib (Pasal 22):</strong> Wajib memakai seragam dan ID Card resmi, melaporkan kecelakaan kerja, menjaga kebersihan & peralatan, menjaga rahasia perusahaan, dilarang menerima suap/komisi, dilarang bekerja rangkap di perusahaan lain, dilarang berjudi/mabuk, dan wajib lapor perubahan data pribadi.</p>
                     <p><strong>Hari Libur (Pasal 23):</strong> Mengikuti hari libur nasional Pemerintah, kecuali pelayanan kesehatan/klinik di lokasi klien yang beroperasi terus-menerus.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 24: HAK CUTI TAHUNAN</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -986,7 +986,6 @@
                       <li>Sisa cuti yang tidak diambil hingga akhir tahun gugur, kecuali karyawan yang baru berhak cuti pada periode Oktober–Desember dapat diperpanjang hingga Maret tahun berikutnya.</li>
                     </ul>
                   </div>
-
                   <div class="space-y-3">
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 25: IZIN MENINGGALKAN PEKERJAAN (TETAP MENERIMA UPAH)</h4>
                     <p class="text-xs text-slate-600">Karyawan dapat meninggalkan pekerjaan tanpa mengurangi hak cuti tahunan dengan tetap menerima upah penuh dalam peristiwa berikut:</p>
@@ -1015,7 +1014,6 @@
                     </div>
                     <p class="text-xs text-slate-600">*Pengaturan jadwal menyusui disesuaikan kondisi pekerjaan atas persetujuan atasan. Permohonan izin (kecuali kematian, kelahiran, bencana) wajib diajukan tertulis minimal <strong>2 minggu sebelumnya</strong> dengan bukti sah.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 26 & 27: ISTIRAHAT MELAHIRKAN/KEGUGURAN & IBADAH WAJIB</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -1023,12 +1021,10 @@
                       <li><strong>Ibadah Wajib Keagamaan (Pasal 27):</strong> Karyawan berhak atas izin dibayar penuh untuk menunaikan ibadah wajib keagamaan.</li>
                     </ul>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 28: IZIN DI LUAR TANGGUNGAN PERUSAHAAN (UNPAID LEAVE)</h4>
                     <p>Dapat diajukan oleh karyawan dengan masa kerja minimal <strong>5 tahun</strong> terus-menerus (pengajuan min. 1 bulan sebelumnya) untuk keperluan studi atau merawat keluarga inti sakit keras, berdurasi minimal <strong>3 bulan</strong> dan maksimal <strong>6 bulan</strong> atas persetujuan Direktur. Selama izin, tidak menerima penghasilan dan tidak dihitung sebagai masa kerja.</p>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 29: ISTIRAHAT SAKIT</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -1235,9 +1231,6 @@
             }
           ],
 
-          // =========================================================================
-          // 2. CV MEDIKA GROUP MANDIRI (BAB I - XIII, PASAL 1 - 53)
-          // =========================================================================
           CV_MGM: [
             {
               id: 'mgm-bab-1',
@@ -1367,7 +1360,6 @@
                       <li>Karyawan wajib melakukan scan kehadiran melalui <strong>mesin fingerprint</strong> atau alat pencatat kehadiran yang tersedia setiap harinya. Saat jam kerja dimulai dilarang masih mengganti seragam, berdandan, atau makan di tempat kerja.</li>
                     </ul>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 19, 20 & 21: TATA TERTIB, HARI LIBUR & HAK CUTI TAHUNAN</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -1375,7 +1367,6 @@
                       <li><strong>Hak Cuti Tahunan (Pasal 21):</strong> <strong>12 hari kerja</strong> per tahun (Januari–Desember) setelah masa kerja 12 bulan (prorata <code>N/12 × 12</code> untuk karyawan baru). Dapat diambil setelah masa kerja <strong>3 bulan</strong> (karyawan tetap) atau <strong>1 tahun</strong> (kontrak), maksimal <strong>4 hari</strong> per pengambilan.</li>
                     </ul>
                   </div>
-
                   <div class="space-y-3">
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1">Pasal 22: IJIN MENINGGALKAN PEKERJAAN (TETAP MENERIMA UPAH)</h4>
                     <div class="overflow-x-auto">
@@ -1402,7 +1393,6 @@
                       </table>
                     </div>
                   </div>
-
                   <div>
                     <h4 class="font-bold text-slate-900 text-base border-b pb-1 mb-2">Pasal 23 - 26: MELAHIRKAN, IBADAH, UNPAID LEAVE & ISTIRAHAT SAKIT</h4>
                     <ul class="list-disc pl-5 space-y-1">
@@ -1627,7 +1617,7 @@
           { no: 25, desc: 'Tidak menyampaikan laporan pertanggungjawaban uang muka sesuai batas waktu yang ditetapkan tanpa alasan yang dapat dipertanggungjawabkan.', sanksi: 'SP2' }
         ],
 
-        // DAFTAR LENGKAP 18 PELANGGARAN RINGAN (TERMASUK NO. 9)
+        // DAFTAR LENGKAP 18 PELANGGARAN RINGAN
         pelanggaranRinganList: [
           { no: 1, desc: 'Tidak mampu menunjukkan kompetensi dan kemampuannya, tidak dapat mencapai sasaran kerja sesuai target walaupun telah dibina/dilatih.', sanksi: 'SP1' },
           { no: 2, desc: 'Dalam menjalankan pekerjaan tidak sesuai standar operasional prosedur (SOP) yang ditetapkan sehingga terjadi kesalahan merugikan.', sanksi: 'SP1' },
@@ -1684,14 +1674,8 @@
           return this.branchNotifications[0];
         },
 
-        // METHODS
-        initApp() {
-          const savedNotifs = localStorage.getItem('pp_notifications');
-          if (savedNotifs) this.notifications = JSON.parse(savedNotifs);
-
-          const savedEmps = localStorage.getItem('pp_employees');
-          if (savedEmps) this.employeesList = JSON.parse(savedEmps);
-
+        // METHODS (SINKRONISASI GOOGLE SHEETS)
+        async initApp() {
           const savedLoginLogo = localStorage.getItem('pp_login_logo');
           if (savedLoginLogo) this.loginLogo = savedLoginLogo;
 
@@ -1702,8 +1686,43 @@
           if (savedMgmLogo) this.branches.CV_MGM.logo = savedMgmLogo;
 
           this.$nextTick(() => lucide.createIcons());
+          await this.fetchFromGoogleSheets();
         },
-        handleLogin() {
+        async fetchFromGoogleSheets() {
+          if (!this.GOOGLE_SCRIPT_URL || this.GOOGLE_SCRIPT_URL.includes('TEMPEL_URL')) return;
+          this.isSyncing = true;
+          try {
+            const res = await fetch(this.GOOGLE_SCRIPT_URL);
+            const data = await res.json();
+            if (data.status === 'success') {
+              if (data.employees) this.employeesList = data.employees;
+              if (data.notifications && data.notifications.length > 0) {
+                this.notifications = data.notifications;
+              }
+            }
+          } catch (err) {
+            console.error('Gagal mengambil data dari Google Sheets:', err);
+          } finally {
+            this.isSyncing = false;
+          }
+        },
+        async postToGoogleSheets(payload) {
+          if (!this.GOOGLE_SCRIPT_URL || this.GOOGLE_SCRIPT_URL.includes('TEMPEL_URL')) return;
+          this.isSyncing = true;
+          try {
+            await fetch(this.GOOGLE_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          } catch (err) {
+            console.error('Gagal mengirim data ke Google Sheets:', err);
+          } finally {
+            this.isSyncing = false;
+          }
+        },
+        async handleLogin() {
           this.currentUser = {
             role: 'employee',
             branch: this.loginForm.branch,
@@ -1723,40 +1742,50 @@
           else if (hour < 18) this.greetingText = 'Selamat Sore';
           else this.greetingText = 'Selamat Malam';
 
-          if (!this.employeesList.some(e => e.nik === this.currentUser.nik)) {
-            this.employeesList.push({ ...this.currentUser, signed: false, signedAt: '-' });
-            localStorage.setItem('pp_employees', JSON.stringify(this.employeesList));
+          await this.fetchFromGoogleSheets();
+
+          const existing = this.employeesList.find(e => e.nik === this.currentUser.nik);
+          if (!existing) {
+            const newEmp = { ...this.currentUser, signed: false, signedAt: '-' };
+            this.employeesList.push(newEmp);
+            await this.postToGoogleSheets({ action: 'upsert_employee', ...newEmp });
+          } else {
+            this.submitted = existing.signed;
           }
+
           this.$nextTick(() => { lucide.createIcons(); this.initCanvas(); });
         },
-        promptAdminLogin() {
+        async promptAdminLogin() {
           const pin = prompt("Masukkan Kode PIN / Password Administrator:");
           if (pin === "admin123") {
             this.currentUser = { role: 'admin', name: 'HR Administrator', nik: 'ADM-01', position: 'HR Manager' };
             this.isLoggedIn = true;
             this.activeTab = 'admin_dashboard';
+            await this.fetchFromGoogleSheets();
             this.$nextTick(() => { lucide.createIcons(); });
           } else if (pin !== null) {
             alert("PIN Admin Salah!");
           }
         },
-        publishNotification() {
+        async publishNotification() {
           const today = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-          this.notifications.unshift({
+          const newNotif = {
             id: Date.now(),
             targetBranch: this.notifForm.targetBranch,
             title: this.notifForm.title,
             message: this.notifForm.message,
             date: today
-          });
-          localStorage.setItem('pp_notifications', JSON.stringify(this.notifications));
+          };
+          this.notifications.unshift(newNotif);
           this.notifForm.title = '';
           this.notifForm.message = '';
-          alert('Notifikasi pembaruan peraturan berhasil dipublikasikan ke karyawan!');
+
+          await this.postToGoogleSheets({ action: 'add_notification', ...newNotif });
+          alert('Notifikasi berhasil dipublikasikan ke Google Sheets dan seluruh karyawan!');
         },
-        deleteNotification(id) {
+        async deleteNotification(id) {
           this.notifications = this.notifications.filter(n => n.id !== id);
-          localStorage.setItem('pp_notifications', JSON.stringify(this.notifications));
+          await this.postToGoogleSheets({ action: 'delete_notification', id: id });
         },
         markNotificationsRead() {
           if (!this.currentUser) return;
@@ -1833,15 +1862,28 @@
           const canvas = document.getElementById('signature-canvas');
           if (canvas) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); }
         },
-        submitSignature() {
-          this.submitted = true;
+        async submitSignature() {
+          const canvas = document.getElementById('signature-canvas');
+          const signatureBase64 = canvas ? canvas.toDataURL('image/png') : '';
           const now = new Date().toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+          this.submitted = true;
           const emp = this.employeesList.find(e => e.nik === this.currentUser.nik);
           if (emp) {
             emp.signed = true;
             emp.signedAt = now;
-            localStorage.setItem('pp_employees', JSON.stringify(this.employeesList));
           }
+
+          await this.postToGoogleSheets({
+            action: 'upsert_employee',
+            nik: this.currentUser.nik,
+            name: this.currentUser.name,
+            position: this.currentUser.position,
+            branch: this.currentUser.branch,
+            signed: true,
+            signedAt: now,
+            signatureImage: signatureBase64
+          });
         },
         exportComplianceCSV() {
           const data = this.filteredEmployees;
